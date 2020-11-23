@@ -11,5 +11,6 @@
 </h1>
 
 <P>  The time on the server is ${serverTime}.안녕 a ＆興 </P>
+<a href="${pageContext.request.contextPath}/board/board.do"></a>
 </body>
 </html>

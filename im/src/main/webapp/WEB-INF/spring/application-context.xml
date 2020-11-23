@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+	
+	
+	<context:property-placeholder location="classpath:datasource.properties" />
+	<context:property-placeholder location="classpath:emaildatasource.properties" />
+	
+	<!-- Root Context: defines shared resources visible to all other web components -->
+	<!-- #5.1. datasource & mybatis 관련 빈 등록 -->
+	<!-- #10.1. log4jdbc ProxyDatasource 빈 설정 -->
+	<bean class="org.apache.commons.dbcp.BasicDataSource" id="realDataSource" destroy-method="close">
+		<property name="driverClassName" value="${datasource.driver}"/>
+		<property name="url" value="${datasource.url}"/>
+		<property name="username" value="${datasource.username}"/>
+		<property name="password" value="${datasource.password}"/>
+	</bean>
+	<bean class="net.sf.log4jdbc.Log4jdbcProxyDataSource" id="dataSource">
+		<constructor-arg ref="realDataSource"/>
+		<property name="logFormatter">
+			<bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+				<property name="loggingType" value="MULTI_LINE"/>
+				<property name="sqlPrefix" value="[SQL] "/>
+			</bean>
+		</property>
+	</bean>
+	
+	<bean class="org.mybatis.spring.SqlSessionFactoryBean" id="sqlSessionFactoryBean">
+		<!-- ref속성으로 dataSource빈을 참조한다. -->
+		<property name="dataSource" ref="dataSource"/>
+		<!-- mybatis관련 설정파일은 target/classes에서 참조한다. -->
+		<property name="configLocation" value="classpath:mybatis-config.xml"/>
+		<property name="mapperLocations" value="classpath*:mapper/**/*-mapper.xml"/>
+	</bean>
+	
+	<bean class="org.mybatis.spring.SqlSessionTemplate"
+		  id="sqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactoryBean" />
+	</bean>
+	
+	
+	<!-- #13.1 transaction처리를 위한 transaction-manager 빈 등록 -->
+	<bean id="transactionManager"
+		  class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+		
+	<!-- #13.2 @Transational 어노테이션에 대해 Transaction Advice 적용 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+	
+
+
+</beans>

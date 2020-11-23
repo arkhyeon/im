@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="board">
+
+	<select id="selectBoardList" resultMap="boardMap">
+		select
+			*
+		from
+			board
+	</select>
+	
+	<resultMap id="boardMap" type="board">
+		<id column="board_no" property="no"></id>
+		<result column="board_title" property="boardTitle"></result>
+		<result column="board_content" property="boardContent"></result>
+		<result column="board_date" property="boardDate"></result>
+		<result column="board_writer" property="boardWriter"></result>
+		<result column="board_password" property="boardPassword"></result>
+		<result column="board_hit" property="boardHit"></result>
+	</resultMap>
+</mapper>

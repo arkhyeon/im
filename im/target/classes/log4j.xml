@@ -10,9 +10,38 @@
 		</layout>
 	</appender>
 	
+	<!-- 시스템 Logging -->
+	<appender class="org.apache.log4j.DailyRollingFileAppender"
+			  name="fileLogger">
+		<param name="file" 
+			   value="${catalina.base}/logs/im/spring.log"/>
+		<param name="append" 
+			   value="true"/>
+		<param name="datePattern"
+			   value=".yyyy-MM-dd"/>
+		<layout class="org.apache.log4j.PatternLayout">
+			<param name="ConversionPattern" 
+				   value="%-5p[%d{yyyy-MM-dd HH:mm:ss}]: %F(%L) - %m%n" />
+		</layout>
+	</appender>
+	
 	<!-- Application Loggers -->
-	<logger name="com.kh.im">
+	<!-- 로깅내역을 수집하는 객체 -->
+	<logger name="com.kh.im" additivity="true">
 		<level value="info" />
+	</logger>
+	
+	<!-- #10.2 log4jdbc logger 등록 -->
+	<logger name="jdbc.sqlonly">
+		<level value="INFO"/>
+	</logger>
+	<logger name="jdbc.resultsettable">
+		<level value="INFO"/>
+	</logger>
+	
+	<!-- Application Loggers -->
+	<logger name="com.kh.petever" additivity="true">
+		<level value="debug" />
 	</logger>
 	
 	<!-- 3rdparty Loggers -->
@@ -36,6 +65,7 @@
 	<root>
 		<priority value="warn" />
 		<appender-ref ref="console" />
+		<appender-ref ref="fileLogger" />
 	</root>
 	
 </log4j:configuration>

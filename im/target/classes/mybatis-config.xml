@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+	
+	<settings>
+		<setting name="jdbcTypeForNull" value="NULL"></setting>
+		<setting name="mapUnderscoreToCamelCase" value="true"/>
+	</settings>
+	
+ 	<typeAliases>
+		<typeAlias type="com.kh.im.common.typehandler.StringArrayTypeHandler" alias="strArrTypeHandler"/> 
+		<typeAlias type="org.springframework.security.core.authority.SimpleGrantedAuthority" alias="simpleGrantedAuthority"/>
+		<package name="com.kh.im"/>
+	</typeAliases>
+	
+ 	<typeHandlers>
+		<typeHandler handler="com.kh.im.common.typehandler.StringArrayTypeHandler"/>
+	</typeHandlers>
+	
+
+</configuration>
