@@ -134,34 +134,36 @@ export const SET_BONUS = { gold: 0.05, critChance: 0.0025 };
 export const TAP_GOLD = 3;
 export const WORKER_GOLD = 1;
 export const BREAK_BONUS = 3;
-// 지금 광석을 10번 부수면 다음 광석 보스에 도전할 수 있어요. 보스는 탭으로만 잡아요.
-export const BOSS = { breaksNeeded: 10, hpMult: 25, seconds: 30, rewardMult: 8 };
-const ore = (id, name, hp, mult, faces, vein, bg, byproducts) => ({ id, name, hp, mult, faces, vein, bg, byproducts });
+// 광석 15종 × 레벨 10 = 150단계. 가장 높은 단계를 5번 부수면 다음 레벨이 열리고,
+// 각 광석의 Lv.10을 5번 부수면 보스에 도전할 수 있어요. 보스는 탭으로만 잡아요.
+export const ORE_LEVELS = 10;
+export const STAGE_BREAKS = 5;
+export const BOSS = { breaksNeeded: 5, hpMult: 25, seconds: 30, rewardMult: 8 };
+const ore = (id, name, faces, vein, bg) => ({ id, name, faces, vein, bg });
 export const ORES = [
-  ore("stone", "돌", 20, 1,
-    ["#6b5b7b", "#8f7fa6", "#574a66", "#463b55", "#7a6a90"], ["#f5f5f5", "#bdbdbd", "#8d8d8d"], ["#4a3466", "#2a1d3d", "#140d1f"], ["coal", "clay", "mica"]),
-  ore("copper", "구리", 240, 1.6,
-    ["#6d4c41", "#8d6e63", "#5d4037", "#4e342e", "#795548"], ["#ffd0b0", "#e07a4a", "#a14a20"], ["#5a3426", "#2e1a12", "#140a06"], ["clay", "sulfur", "coal"]),
-  ore("iron", "철", 2900, 2.5,
-    ["#546e7a", "#78909c", "#455a64", "#37474f", "#607d8b"], ["#ffffff", "#cfd8dc", "#90a4ae"], ["#2f4550", "#18242b", "#0a1014"], ["coal", "mica", "fossil"]),
-  ore("silver", "은", 3.5e4, 4,
-    ["#5c6b7a", "#8193a6", "#4a5866", "#3b4652", "#6e7f91"], ["#ffffff", "#e3eaf2", "#a9b8c8"], ["#3a4a66", "#1d2638", "#0c1018"], ["quartz", "mica", "sulfur"]),
-  ore("gold", "금", 4.1e5, 6,
-    ["#7a5c3a", "#a07a4a", "#5e4529", "#4a361f", "#8c6a40"], ["#fffbe0", "#ffd54a", "#e09b00"], ["#5a4020", "#2e2010", "#140d08"], ["amber", "quartz", "fossil"]),
-  ore("ruby", "루비", 5e6, 9,
-    ["#6a2c3a", "#8e3e52", "#55222e", "#431a24", "#7a3446"], ["#ffd0dc", "#ff3d6e", "#b0103a"], ["#5e1f2e", "#300f18", "#14050a"], ["sulfur", "obsidian", "amber"]),
-  ore("sapphire", "사파이어", 6e7, 13,
-    ["#2e4870", "#4a6fa8", "#223858", "#1a2c46", "#3b5a8a"], ["#e0f0ff", "#4fa3ff", "#1a5fd0"], ["#1f3a6e", "#132340", "#081020"], ["quartz", "obsidian", "fossil"]),
-  ore("emerald", "에메랄드", 7.2e8, 19,
-    ["#2e5a46", "#447f63", "#234837", "#1a382a", "#386d54"], ["#e0ffe8", "#3ddc84", "#0f8a4a"], ["#1f5a3e", "#123522", "#06140c"], ["amber", "fossil", "clay"]),
-  ore("diamond", "다이아몬드", 8.6e9, 28,
-    ["#3b5a8a", "#5a82c0", "#2e4870", "#223858", "#4a6fa8"], ["#ffffff", "#7ef9ff", "#2bb7d6"], ["#1f4a6e", "#13283d", "#081420"], ["quartz", "obsidian", "coal"]),
-  ore("meteor", "운석", 1e11, 40,
-    ["#5a2a24", "#8a3a2a", "#46201b", "#381814", "#7a3424"], ["#fff2c0", "#ff8a3d", "#e0301a"], ["#5e1f14", "#300f0a", "#140504"], ["obsidian", "sulfur", "amber"]),
+  ore("stone", "돌", ["#6b5b7b", "#8f7fa6", "#574a66", "#463b55", "#7a6a90"], ["#f5f5f5", "#bdbdbd", "#8d8d8d"], ["#4a3466", "#2a1d3d", "#140d1f"]),
+  ore("copper", "구리", ["#6d4c41", "#8d6e63", "#5d4037", "#4e342e", "#795548"], ["#ffd0b0", "#e07a4a", "#a14a20"], ["#5a3426", "#2e1a12", "#140a06"]),
+  ore("tin", "주석", ["#7b8a8f", "#9fb0b5", "#66767b", "#55636a", "#8a9ba0"], ["#ffffff", "#dfe6e8", "#a7b5b9"], ["#3c4a50", "#1f282c", "#0c1214"]),
+  ore("iron", "철", ["#546e7a", "#78909c", "#455a64", "#37474f", "#607d8b"], ["#ffffff", "#cfd8dc", "#90a4ae"], ["#2f4550", "#18242b", "#0a1014"]),
+  ore("nickel", "니켈", ["#6f6a5f", "#938c7c", "#5b574e", "#4a4740", "#7f796c"], ["#fffef5", "#d8d2b8", "#9e977c"], ["#45412f", "#24221a", "#0f0e0a"]),
+  ore("silver", "은", ["#5c6b7a", "#8193a6", "#4a5866", "#3b4652", "#6e7f91"], ["#ffffff", "#e3eaf2", "#a9b8c8"], ["#3a4a66", "#1d2638", "#0c1018"]),
+  ore("gold", "금", ["#7a5c3a", "#a07a4a", "#5e4529", "#4a361f", "#8c6a40"], ["#fffbe0", "#ffd54a", "#e09b00"], ["#5a4020", "#2e2010", "#140d08"]),
+  ore("platinum", "백금", ["#8a8fa3", "#b3b8cc", "#737889", "#5f6372", "#9da2b5"], ["#ffffff", "#eef1ff", "#b9c0de"], ["#4a4f6e", "#262a40", "#0e1020"]),
+  ore("ruby", "루비", ["#6a2c3a", "#8e3e52", "#55222e", "#431a24", "#7a3446"], ["#ffd0dc", "#ff3d6e", "#b0103a"], ["#5e1f2e", "#300f18", "#14050a"]),
+  ore("sapphire", "사파이어", ["#2e4870", "#4a6fa8", "#223858", "#1a2c46", "#3b5a8a"], ["#e0f0ff", "#4fa3ff", "#1a5fd0"], ["#1f3a6e", "#132340", "#081020"]),
+  ore("emerald", "에메랄드", ["#2e5a46", "#447f63", "#234837", "#1a382a", "#386d54"], ["#e0ffe8", "#3ddc84", "#0f8a4a"], ["#1f5a3e", "#123522", "#06140c"]),
+  ore("diamond", "다이아몬드", ["#3b5a8a", "#5a82c0", "#2e4870", "#223858", "#4a6fa8"], ["#ffffff", "#7ef9ff", "#2bb7d6"], ["#1f4a6e", "#13283d", "#081420"]),
+  ore("mithril", "미스릴", ["#3d6e7a", "#5c97a5", "#305963", "#254750", "#4b8290"], ["#f0ffff", "#9ff3ff", "#3fc9e0"], ["#1e5560", "#113038", "#061418"]),
+  ore("orichalcum", "오리하르콘", ["#7a4a20", "#a86a30", "#5e3818", "#4a2c12", "#8f5a28"], ["#fff0d0", "#ff9e40", "#d0601a"], ["#5e3510", "#301b08", "#140b03"]),
+  ore("meteor", "운석", ["#5a2a24", "#8a3a2a", "#46201b", "#381814", "#7a3424"], ["#fff2c0", "#ff8a3d", "#e0301a"], ["#5e1f14", "#300f0a", "#140504"]),
 ];
+// 단계 s(0~149)의 HP와 골드 배율: 단계마다 HP ×1.2, 골드 ×1.028
+export const STAGE_HP = { base: 20, growth: 1.2 };
+export const STAGE_MULT_GROWTH = 1.028;
 
 // ---------- 부산물 시장 ----------
-// 모든 부산물은 같은 가격에서 시작해요. 20분마다 많이 팔린 건 싸지고 덜 팔린 건 비싸져요.
+// 모든 부산물은 같은 가격에서 시작하고, 어느 광석에서든 랜덤으로 나와요.
+// 20분마다 많이 팔린 건 싸지고 덜 팔린 건 비싸져요.
 export const BYPRODUCT_PRICE = 100;
 export const BYPRODUCTS = [
   { id: "coal", name: "석탄", color: "#5d5d5d" },

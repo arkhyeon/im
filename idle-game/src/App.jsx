@@ -12,7 +12,9 @@ import {
   MAX_LEVEL,
   MAX_OFFLINE_SEC,
   MERGE,
+  ORE_LEVELS,
   ORES,
+  STAGE_BREAKS,
   PITY,
   QUESTS,
   RARITIES,
@@ -36,11 +38,10 @@ import {
   equipNameOf,
   fmt,
   incomeOf,
-  isOreUnlocked,
+  isBossGate,
   makeCharm,
   nextStreakOf,
   normalize,
-  oreIndexOf,
   pickCharmMaterials,
   pickMergeMaterials,
   pickWorker,
@@ -54,6 +55,9 @@ import {
   rollMergeOutcome,
   rollWorker,
   setTierOf,
+  STAGE_COUNT,
+  stageNameOf,
+  stageOf,
   statsOf,
   stonesFor,
   toSave,
@@ -196,7 +200,7 @@ function Login({ onGuest }) {
   return (
     <div className="game login">
       <div className="login-art">
-        <OreRock ore={ORES[4]} />
+        <OreRock ore={ORES[6]} />
         <div className="login-girls">
           {[WORKERS[0], WORKERS[16], WORKERS[24]].map((w) => (
             <WorkerIcon key={w.id} look={w.look} rarity={w.rarity} size={92} />
@@ -314,7 +318,7 @@ function Game({ user, onExit }) {
         const st = statsOf(g);
         const damage = st.workerPower * (rushing ? RUSH.rateMult : 1) * dt;
         if (damage <= 0) return g;
-        if (fighting) return addGold(g, damage * ORES[oreIndexOf(g.ore)].mult * st.goldMult * WORKER_GOLD);
+        if (fighting) return addGold(g, damage * stageOf(g.stage).mult * st.goldMult * WORKER_GOLD);
         return applyDamage(g, damage, st, rolls, WORKER_GOLD);
       });
       setRush((r) => {
@@ -389,10 +393,11 @@ function Game({ user, onExit }) {
     const lb = game.lastBreak;
     if (!lb || lb.seq === lastBreakSeq.current) return;
     lastBreakSeq.current = lb.seq;
+    if (lb.unlocked !== null) showToast(`⛏️ ${stageNameOf(lb.unlocked)} 해금!`, stageOf(lb.unlocked).ore.vein[1]);
     const now = Date.now();
     if (now - lastShatter.current < 1200) return;
     lastShatter.current = now;
-    const ore = ORES.find((o) => o.id === lb.ore);
+    const ore = stageOf(lb.stage).ore;
     const width = sceneRef.current?.clientWidth || 360;
     const x = width / 2;
     const y = 150;
@@ -420,8 +425,8 @@ function Game({ user, onExit }) {
   const now = Date.now();
   const rushing = rush.until > now;
   const rushLeft = rushing ? (rush.until - now) / 1000 : 0;
-  const oreIndex = oreIndexOf(game.ore);
-  const ore = ORES[oreIndex];
+  const stage = stageOf(game.stage);
+  const ore = stage.ore;
   const income = incomeOf(game, stats) * (rushing ? RUSH.rateMult : 1);
   const daily = dailyOf(game.daily);
   const attendanceDue = loaded && game.attendance.last !== todayKey();
@@ -436,11 +441,11 @@ function Game({ user, onExit }) {
   const startBoss = () => {
     const g = gameRef.current;
     if (!canChallengeBoss(g) || bossRef.current) return;
-    const max = bossHpOf(g.oreLevel);
-    const next = { level: g.oreLevel, hp: max, max, until: Date.now() + BOSS.seconds * 1000 };
+    const max = bossHpOf(g.stageLevel);
+    const next = { level: g.stageLevel, hp: max, max, until: Date.now() + BOSS.seconds * 1000 };
     bossRef.current = next;
     setBoss(next);
-    showBanner(`${ORES[g.oreLevel].name} 광석 보스 등장!`, `${BOSS.seconds}초 안에 탭으로 부수세요`, "#ff5252");
+    showBanner(`${stageNameOf(g.stageLevel)} 보스 등장!`, `${BOSS.seconds}초 안에 탭으로 부수세요`, "#ff5252");
   };
 
   const tap = (e) => {
@@ -450,7 +455,7 @@ function Game({ user, onExit }) {
     const isRushing = rushRef.current.until > Date.now();
     const crit = Math.random() < st.critChance;
     const damage = st.tapDamage * (crit ? st.critMult : 1) * (isRushing ? st.rushTapMult : 1);
-    const gain = damage * ORES[oreIndexOf(g.ore)].mult * st.goldMult * TAP_GOLD;
+    const gain = damage * stageOf(g.stage).mult * st.goldMult * TAP_GOLD;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const items = [{ id: ++fxId.current, type: crit ? "crit" : "text", x, y, text: crit ? `치명타! +${fmt(gain)}` : `+${fmt(gain)}`, big: isRushing }];
@@ -474,11 +479,11 @@ function Game({ user, onExit }) {
         bossRef.current = null;
         setBoss(null);
         const target = fight.level + 1;
-        const reward = fight.max * ORES[fight.level].mult * st.goldMult * BOSS.rewardMult;
+        const reward = fight.max * stageOf(fight.level).mult * st.goldMult * BOSS.rewardMult;
         setGame((prev) =>
-          addGold({ ...prev, oreLevel: Math.max(prev.oreLevel, target), ore: ORES[target].id, oreDamage: 0 }, reward)
+          addGold({ ...prev, stageLevel: Math.max(prev.stageLevel, target), stage: target, stageBreaks: 0, oreDamage: 0 }, reward)
         );
-        showBanner("보스 처치!", `${ORES[target].name} 광석 해금 · 골드 +${fmt(reward)}`, ORES[target].vein[1]);
+        showBanner("보스 처치!", `${stageOf(target).ore.name} 광석 해금 · 골드 +${fmt(reward)}`, stageOf(target).ore.vein[1]);
       }
     } else {
       const rolls = randoms();
@@ -500,16 +505,15 @@ function Game({ user, onExit }) {
       startRush(statsOf(gameRef.current).rushDuration);
       return;
     }
-    const reward = Math.max(500, incomeOf(gameRef.current) * 60 + statsOf(gameRef.current).tapDamage * ore.mult * TAP_GOLD * 30);
+    const reward = Math.max(500, incomeOf(gameRef.current) * 60 + statsOf(gameRef.current).tapDamage * stage.mult * TAP_GOLD * 30);
     addFx([{ id: ++fxId.current, type: "text", x: e.clientX - rect.left, y: e.clientY - rect.top, text: `+${fmt(reward)}`, big: true }]);
     showBanner("황금 박쥐 포획!", `골드 +${fmt(reward)}`);
     setGame((g) => addGold(g, reward));
   };
 
-  const selectOre = (id) => {
-    const index = ORES.findIndex((o) => o.id === id);
-    if (bossRef.current || !isOreUnlocked(gameRef.current, index)) return;
-    setGame((g) => (g.ore === id ? g : { ...g, ore: id, oreDamage: 0 }));
+  const selectStage = (target) => {
+    if (bossRef.current || target > gameRef.current.stageLevel) return;
+    setGame((g) => (g.stage === target ? g : { ...g, stage: target, oreDamage: 0 }));
   };
 
   // count레벨을 한 번에 올림 (최대 버튼)
@@ -756,10 +760,12 @@ function Game({ user, onExit }) {
     onExit();
   };
 
-  const walkers = WORKERS.filter((w) => game.workers[w.id])
-    .sort((a, b) => b.rarity - a.rarity || b.rate - a.rate)
-    .flatMap((w) => Array.from({ length: Math.min(game.workers[w.id], MAX_WALKERS) }, () => w))
-    .slice(0, MAX_WALKERS);
+  // 서로 다른 광부를 높은 등급부터 먼저 보여주고, 자리가 남으면 중복으로 채워요
+  const ownedWorkers = WORKERS.filter((w) => game.workers[w.id]).sort((a, b) => b.rarity - a.rarity || b.rate - a.rate);
+  const walkers = [
+    ...ownedWorkers,
+    ...ownedWorkers.flatMap((w) => Array.from({ length: Math.min(game.workers[w.id] - 1, MAX_WALKERS) }, () => w)),
+  ].slice(0, MAX_WALKERS);
   const dots = {
     workers: adsLeft > 0,
     charms: game.stones >= CHARM_GACHA.cost,
@@ -767,10 +773,11 @@ function Game({ user, onExit }) {
     prestige: game.gold >= prestigeCostOf(game.prestiges),
   };
   const bossReady = canChallengeBoss(game);
-  const topOre = ORES[game.oreLevel];
-  const nextOre = ORES[game.oreLevel + 1];
+  const top = stageOf(game.stageLevel);
+  const nextOre = ORES[top.oreIndex + 1];
   const fighting = Boolean(boss);
-  const shownOre = fighting ? ORES[boss.level] : ore;
+  const shownOre = fighting ? stageOf(boss.level).ore : ore;
+  const progressNeed = isBossGate(game.stageLevel) ? BOSS.breaksNeeded : STAGE_BREAKS;
 
   if (!loaded) return <div className="splash">광산 여는 중...</div>;
 
@@ -831,15 +838,15 @@ function Game({ user, onExit }) {
       </header>
 
       <div className="ore-picker" aria-label="캘 광석">
-        {ORES.slice(0, game.oreLevel + 2).map((o, i) => {
-          const unlocked = isOreUnlocked(game, i);
+        {ORES.slice(0, top.oreIndex + 2).map((o, i) => {
+          const unlocked = i <= top.oreIndex;
           return (
             <button
               key={o.id}
-              className={`ore-chip ${game.ore === o.id ? "active" : ""} ${unlocked ? "" : "locked"}`}
+              className={`ore-chip ${stage.oreIndex === i ? "active" : ""} ${unlocked ? "" : "locked"}`}
               style={{ "--oc": o.vein[1] }}
               disabled={!unlocked || fighting}
-              onClick={() => selectOre(o.id)}
+              onClick={() => selectStage(Math.min(game.stageLevel, i * ORE_LEVELS + ORE_LEVELS - 1))}
             >
               <OreItemIcon ore={o} size={20} />
               <span>{unlocked ? o.name : `👑 ${o.name}`}</span>
@@ -848,13 +855,33 @@ function Game({ user, onExit }) {
         })}
       </div>
 
-      {nextOre && !fighting && (
+      <div className="level-picker" aria-label="광석 레벨">
+        {Array.from({ length: ORE_LEVELS }, (_, l) => {
+          const target = stage.oreIndex * ORE_LEVELS + l;
+          const unlocked = target <= game.stageLevel;
+          return (
+            <button
+              key={l}
+              className={`level-chip ${game.stage === target ? "active" : ""} ${unlocked ? "" : "locked"} ${isBossGate(target) ? "gate" : ""}`}
+              disabled={!unlocked || fighting}
+              onClick={() => selectStage(target)}
+            >
+              {isBossGate(target) ? "👑" : ""}
+              {l + 1}
+            </button>
+          );
+        })}
+      </div>
+
+      {!fighting && (
         <button className={`boss-bar ${bossReady ? "ready" : ""}`} disabled={!bossReady} onClick={startBoss}>
-          {bossReady
-            ? `👑 ${topOre.name} 광석 보스 도전 · ${BOSS.seconds}초 안에 HP ${fmt(bossHpOf(game.oreLevel))} → ${nextOre.name} 해금`
-            : oreIndex === game.oreLevel
-              ? `${topOre.name} 광석을 ${BOSS.breaksNeeded}번 부수면 보스 도전 (${Math.min(game.oreBreaks[topOre.id] || 0, BOSS.breaksNeeded)}/${BOSS.breaksNeeded})`
-              : `보스는 가장 높은 광석(${topOre.name})에서 도전할 수 있어요`}
+          {game.stageLevel >= STAGE_COUNT - 1
+            ? "⛏️ 모든 광석을 정복했어요!"
+            : bossReady
+              ? `👑 ${stageNameOf(game.stageLevel)} 보스 도전 · ${BOSS.seconds}초 안에 HP ${fmt(bossHpOf(game.stageLevel))} → ${nextOre.name} 해금`
+              : game.stage !== game.stageLevel
+                ? `다음 단계는 가장 높은 단계(${stageNameOf(game.stageLevel)})에서 열려요`
+                : `${stageNameOf(game.stageLevel)}을 ${progressNeed}번 부수면 ${isBossGate(game.stageLevel) ? "보스 도전" : "다음 레벨"} (${Math.min(game.stageBreaks, progressNeed)}/${progressNeed})`}
         </button>
       )}
 
@@ -875,7 +902,7 @@ function Game({ user, onExit }) {
           ))}
         {fighting ? (
           <div className="ore-hp boss-hp">
-            <span>👑 {shownOre.name} 광석 보스</span>
+            <span>👑 {stageNameOf(boss.level)} 보스</span>
             <div className="hp-bar">
               <div style={{ width: `${(boss.hp / boss.max) * 100}%` }} />
             </div>
@@ -884,18 +911,18 @@ function Game({ user, onExit }) {
         ) : (
           <div className="ore-hp">
             <span>
-              {ore.name} 광석 · 파괴 {fmt(game.oreBreaks[ore.id] || 0)}회
+              {stageNameOf(game.stage)} · 파괴 {fmt(game.oreBreaks[ore.id] || 0)}회
             </span>
             <div className="hp-bar">
-              <div style={{ width: `${(1 - game.oreDamage / ore.hp) * 100}%` }} />
+              <div style={{ width: `${(1 - game.oreDamage / stage.hp) * 100}%` }} />
             </div>
             <span className="hp-text">
-              {fmt(Math.max(0, ore.hp - game.oreDamage))} / {fmt(ore.hp)}
+              {fmt(Math.max(0, stage.hp - game.oreDamage))} / {fmt(stage.hp)}
             </span>
           </div>
         )}
         <div key={hit} className={`rock-wrap ${hit ? "hit" : ""}`}>
-          <OreRock ore={shownOre} damage={fighting ? 1 - boss.hp / boss.max : game.oreDamage / ore.hp} boss={fighting} />
+          <OreRock ore={shownOre} damage={fighting ? 1 - boss.hp / boss.max : game.oreDamage / stage.hp} boss={fighting} />
         </div>
         <div className="ground" />
         {walkers.map((w, i) => (

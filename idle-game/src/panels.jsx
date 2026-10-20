@@ -602,7 +602,7 @@ export function MarketPanel({ game, market, onSell }) {
           </div>
         );
       })}
-      <p className="mission-note">부산물은 광석을 부수면 나와요. 비싼 광석일수록 많이 나와요. 시장에서 번 골드는 랭킹 점수에 들어가지 않아요.</p>
+      <p className="mission-note">부산물은 어느 광석을 부숴도 8종 중에서 랜덤으로 나와요. 높은 단계일수록 많이 나와요. 시장에서 번 골드는 랭킹 점수에 들어가지 않아요.</p>
     </div>
   );
 }

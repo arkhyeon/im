@@ -11,12 +11,16 @@ import {
   EQUIP_GROWTH,
   MATERIALS,
   MAX_LEVEL,
+  ORE_LEVELS,
   ORES,
   PRESTIGE,
   QUESTS,
   RARITIES,
   RUSH,
   SET_BONUS,
+  STAGE_BREAKS,
+  STAGE_HP,
+  STAGE_MULT_GROWTH,
   TRIBES,
   TRIBE_STEPS,
   WORKER_GOLD,
@@ -159,15 +163,23 @@ export const statsOf = (g) => {
   };
 };
 
-// ---------- 광석 · 보스 ----------
-export const oreIndexOf = (id) => Math.max(0, ORES.findIndex((o) => o.id === id));
-export const isOreUnlocked = (g, index) => index <= g.oreLevel;
+// ---------- 광석 단계 · 보스 ----------
+// 단계 s = 광석 번호 × 10 + (레벨 - 1). 0 = 돌 Lv.1, 149 = 운석 Lv.10
+export const STAGE_COUNT = ORES.length * ORE_LEVELS;
+export const stageOf = (s) => ({
+  index: s,
+  ore: ORES[Math.floor(s / ORE_LEVELS)],
+  oreIndex: Math.floor(s / ORE_LEVELS),
+  level: (s % ORE_LEVELS) + 1,
+  hp: Math.round(STAGE_HP.base * STAGE_HP.growth ** s),
+  mult: STAGE_MULT_GROWTH ** s,
+});
+export const stageNameOf = (s) => `${stageOf(s).ore.name} Lv.${stageOf(s).level}`;
+export const isBossGate = (s) => s % ORE_LEVELS === ORE_LEVELS - 1;
 export const canChallengeBoss = (g) =>
-  g.oreLevel < ORES.length - 1 &&
-  oreIndexOf(g.ore) === g.oreLevel &&
-  (g.oreBreaks[ORES[g.oreLevel].id] || 0) >= BOSS.breaksNeeded;
-export const bossHpOf = (oreLevel) => ORES[oreLevel].hp * BOSS.hpMult;
-export const incomeOf = (g, st = statsOf(g)) => st.workerPower * ORES[oreIndexOf(g.ore)].mult * st.goldMult * WORKER_GOLD;
+  g.stageLevel < STAGE_COUNT - 1 && isBossGate(g.stageLevel) && g.stage === g.stageLevel && g.stageBreaks >= BOSS.breaksNeeded;
+export const bossHpOf = (stageLevel) => stageOf(stageLevel).hp * BOSS.hpMult;
+export const incomeOf = (g, st = statsOf(g)) => st.workerPower * stageOf(g.stage).mult * st.goldMult * WORKER_GOLD;
 
 export const addGold = (g, amount) => ({
   ...g,
@@ -178,36 +190,51 @@ export const addGold = (g, amount) => ({
 
 // 피해를 주고 골드·파괴 보상·부산물을 계산. rolls는 미리 뽑아 둔 난수 (state 업데이트를 순수하게 유지)
 export const applyDamage = (g, damage, st, rolls, goldFactor) => {
-  const index = oreIndexOf(g.ore);
-  const ore = ORES[index];
-  let next = addGold(g, damage * ore.mult * st.goldMult * goldFactor);
+  const stage = stageOf(g.stage);
+  let next = addGold(g, damage * stage.mult * st.goldMult * goldFactor);
   const total = g.oreDamage + damage;
-  const breaks = Math.floor(total / ore.hp);
-  next.oreDamage = total - breaks * ore.hp;
+  const breaks = Math.floor(total / stage.hp);
+  next.oreDamage = total - breaks * stage.hp;
   if (!breaks) return next;
 
   let r = 0;
   const roll = () => rolls[r++ % rolls.length];
-  const bonus = breaks * ore.hp * ore.mult * BREAK_BONUS * st.breakMult * st.goldMult;
+  const bonus = breaks * stage.hp * stage.mult * BREAK_BONUS * st.breakMult * st.goldMult;
   next = addGold(next, bonus);
 
-  const scale = 2 ** index * st.dropMult;
+  // 부산물은 어느 광석에서든 8종 중 랜덤, 높은 단계일수록 많이
+  const scale = 1.03 ** g.stage * st.dropMult;
   const items = {};
   const rolled = Math.min(breaks, 20);
   for (let i = 0; i < rolled; i++) {
-    const id = ore.byproducts[Math.floor(roll() * ore.byproducts.length)];
+    const id = BYPRODUCTS[Math.floor(roll() * BYPRODUCTS.length)].id;
     items[id] = (items[id] || 0) + Math.max(1, Math.round((1 + Math.floor(roll() * 3)) * scale));
   }
   if (breaks > rolled) {
-    const extra = Math.round(((breaks - rolled) * 2 * scale) / ore.byproducts.length);
-    ore.byproducts.forEach((id) => (items[id] = (items[id] || 0) + extra));
+    const extra = Math.max(1, Math.round(((breaks - rolled) * 2 * scale) / BYPRODUCTS.length));
+    BYPRODUCTS.forEach((b) => (items[b.id] = (items[b.id] || 0) + extra));
   }
   const byproducts = { ...next.byproducts };
   Object.entries(items).forEach(([id, n]) => (byproducts[id] = (byproducts[id] || 0) + n));
   next.byproducts = byproducts;
-  next.oreBreaks = { ...next.oreBreaks, [ore.id]: (next.oreBreaks[ore.id] || 0) + breaks };
+  next.oreBreaks = { ...next.oreBreaks, [stage.ore.id]: (next.oreBreaks[stage.ore.id] || 0) + breaks };
+
+  // 가장 높은 단계를 5번 부수면 다음 레벨이 열리고 자동으로 넘어가요 (Lv.10은 보스가 막고 있어요)
+  let unlocked = null;
+  if (g.stage === g.stageLevel) {
+    const stageBreaks = g.stageBreaks + breaks;
+    if (!isBossGate(g.stageLevel) && stageBreaks >= STAGE_BREAKS) {
+      next.stageLevel = g.stageLevel + 1;
+      next.stage = next.stageLevel;
+      next.stageBreaks = 0;
+      next.oreDamage = 0;
+      unlocked = next.stageLevel;
+    } else {
+      next.stageBreaks = stageBreaks;
+    }
+  }
   next = bumpDaily(next, "breaks", breaks);
-  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, ore: ore.id, breaks, bonus, items };
+  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, stage: g.stage, breaks, bonus, items, unlocked };
   return next;
 };
 
@@ -287,9 +314,17 @@ export const normalize = (saved) => {
         .map((c) => ({ uid: c.uid, type: c.type, rarity: Math.min(RARITIES.length - 1, Math.floor(num(c.rarity))), value: num(c.value) }))
     : [];
   const oreBreaks = counts(s.oreBreaks, ORES);
-  // 이전 버전 저장(10번 부수면 해금)은 그때 열린 광석까지 인정
-  let legacyLevel = 0;
-  while (legacyLevel < ORES.length - 1 && (oreBreaks[ORES[legacyLevel].id] || 0) >= 10 && typeof s.oreLevel !== "number") legacyLevel++;
+  // 이전 버전(광석 10종 단위 해금) 저장은 그때 열린 광석의 Lv.1부터 시작
+  const OLD_ORDER = ["stone", "copper", "iron", "silver", "gold", "ruby", "sapphire", "emerald", "diamond", "meteor"];
+  let stageLevel;
+  if (typeof s.stageLevel === "number") {
+    stageLevel = Math.floor(num(s.stageLevel));
+  } else {
+    let oldLevel = typeof s.oreLevel === "number" ? Math.floor(num(s.oreLevel)) : 0;
+    if (typeof s.oreLevel !== "number") while (oldLevel < 9 && (oreBreaks[OLD_ORDER[oldLevel]] || 0) >= 10) oldLevel++;
+    stageLevel = ORES.findIndex((o) => o.id === OLD_ORDER[Math.min(oldLevel, 9)]) * ORE_LEVELS;
+  }
+  stageLevel = Math.min(STAGE_COUNT - 1, Math.max(0, stageLevel));
   const g = {
     nickname: typeof s.nickname === "string" ? s.nickname : "",
     gold: num(s.gold),
@@ -300,9 +335,10 @@ export const normalize = (saved) => {
     equip,
     workers: counts(s.workers, WORKERS),
     pity: Math.floor(num(s.pity)),
-    ore: typeof s.ore === "string" ? s.ore : "stone",
-    oreLevel: Math.min(ORES.length - 1, Math.floor(typeof s.oreLevel === "number" ? num(s.oreLevel) : legacyLevel)),
-    oreDamage: num(s.oreDamage),
+    stageLevel,
+    stage: typeof s.stage === "number" ? Math.min(stageLevel, Math.max(0, Math.floor(num(s.stage)))) : stageLevel,
+    stageBreaks: Math.floor(num(s.stageBreaks)),
+    oreDamage: typeof s.stage === "number" ? num(s.oreDamage) : 0,
     oreBreaks,
     byproducts: counts(s.byproducts, BYPRODUCTS),
     charms,
@@ -323,11 +359,6 @@ export const normalize = (saved) => {
       streak: Math.floor(num(s.attendance?.streak)),
     },
   };
-  const index = ORES.findIndex((o) => o.id === g.ore);
-  if (index < 0 || index > g.oreLevel) {
-    g.ore = ORES[g.oreLevel].id;
-    g.oreDamage = 0;
-  }
   return g;
 };
 

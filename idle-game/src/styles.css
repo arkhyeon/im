@@ -2444,3 +2444,36 @@ input:focus-visible {
 .pull-card {
   justify-content: flex-end;
 }
+
+/* 광석 레벨 선택 */
+.level-picker {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.level-chip {
+  padding: 5px 0;
+  border-radius: 8px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.level-chip.active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.level-chip.gate {
+  font-size: 10px;
+}
+
+.level-chip.locked {
+  opacity: 0.4;
+  cursor: default;
+}
