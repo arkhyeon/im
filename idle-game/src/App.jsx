@@ -70,7 +70,7 @@ import {
 } from "./game";
 import { useMarket } from "./market";
 import { buzz, isMuted, setMuted as saveMuted, sfx } from "./sound";
-import { BatIcon, ByproductIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon, WorkerPortrait } from "./art";
+import { BatIcon, ByproductIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon, WorkerPortrait, workerSpriteOf } from "./art";
 import { CharmsPanel, EquipPanel, MarketPanel, MissionsPanel, PrestigePanel, WorkersPanel } from "./panels";
 
 const MAX_WALKERS = 8;
@@ -191,6 +191,9 @@ export default function App() {
   return <Login onGuest={() => setGuest(true)} />;
 }
 
+// 첫 화면에 서 있는 광부 소녀들 (가운데가 가장 커요)
+const LOGIN_GIRLS = ["starminer", "dwarfgod", "primal", "cosmic", "apprentice"];
+
 function Login({ onGuest }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -212,9 +215,15 @@ function Login({ onGuest }) {
       <div className="login-art">
         <OreRock ore={ORES[6]} />
         <div className="login-girls">
-          {[WORKERS[0], WORKERS[16], WORKERS[24]].map((w) => (
-            <WorkerIcon key={w.id} look={w.look} rarity={w.rarity} size={92} />
-          ))}
+          {LOGIN_GIRLS.map((id, i) => {
+            const w = WORKERS.find((x) => x.id === id);
+            const sprite = workerSpriteOf(id);
+            return sprite ? (
+              <img key={id} src={sprite} alt="" draggable={false} className={`login-girl pos${i}`} style={{ animationDelay: `${-i * 0.4}s` }} />
+            ) : (
+              <WorkerIcon key={id} look={w.look} rarity={w.rarity} size={92} />
+            );
+          })}
         </div>
       </div>
       <h1 className="title">광석 캐기</h1>
