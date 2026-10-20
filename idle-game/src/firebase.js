@@ -5,10 +5,12 @@ import {
   doc,
   getDoc,
   getFirestore,
+  increment,
   limit,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
@@ -67,3 +69,30 @@ export const watchTop3 = (callback) => {
     (error) => console.error("랭킹 불러오기 실패", error)
   );
 };
+
+// ---------- 광석 시세 (모든 유저 공용) ----------
+// market/state: 현재 시세, market_trades/{구간}: 그 20분 동안의 매수·매도량
+export const watchMarket = (callback) =>
+  onSnapshot(
+    doc(db, "market", "state"),
+    (snap) => callback(snap.exists() ? snap.data() : null),
+    (error) => console.error("시세 불러오기 실패", error)
+  );
+
+// 구간이 바뀌었으면 처음 본 유저가 다음 시세를 계산해 저장 (트랜잭션이라 한 번만 반영)
+export const advanceMarket = (target, advance, initial) =>
+  runTransaction(db, async (tx) => {
+    const stateRef = doc(db, "market", "state");
+    const snap = await tx.get(stateRef);
+    if (!snap.exists()) {
+      tx.set(stateRef, initial(target));
+      return;
+    }
+    const state = snap.data();
+    if (state.window >= target) return;
+    const trades = await tx.get(doc(db, "market_trades", String(state.window)));
+    tx.set(stateRef, advance(state, trades.exists() ? trades.data() : null, target));
+  });
+
+export const recordTrade = (window, side, oreId, qty) =>
+  setDoc(doc(db, "market_trades", String(window)), { [side]: { [oreId]: increment(qty) } }, { merge: true });

@@ -11,10 +11,22 @@ service cloud.firestore {
         && request.resource.data.nickname.size() <= 12
         && request.resource.data.gold is number
         && request.resource.data.totalEarned is number
-        && request.resource.data.clickLevel is int
-        && request.resource.data.owned is map
-        && request.resource.data.workers is map
-        && request.resource.data.pulls is map;
+        && request.resource.data.equip is map
+        && request.resource.data.workers is map;
+    }
+
+    // 광석 시세: 누구나 읽고, 로그인한 유저가 20분마다 갱신
+    match /market/state {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.data.window is int
+        && request.resource.data.prices is map;
+    }
+
+    // 20분 구간별 매수·매도량
+    match /market_trades/{window} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
