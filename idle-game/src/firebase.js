@@ -70,11 +70,11 @@ export const watchTop3 = (callback) => {
   );
 };
 
-// ---------- 광석 시세 (모든 유저 공용) ----------
-// market/state: 현재 시세, market_trades/{구간}: 그 20분 동안의 매수·매도량
+// ---------- 부산물 시세 (모든 유저 공용) ----------
+// market/byproducts: 현재 시세, byproduct_trades/{구간}: 그 20분 동안 팔린 양
 export const watchMarket = (callback) =>
   onSnapshot(
-    doc(db, "market", "state"),
+    doc(db, "market", "byproducts"),
     (snap) => callback(snap.exists() ? snap.data() : null),
     (error) => console.error("시세 불러오기 실패", error)
   );
@@ -82,7 +82,7 @@ export const watchMarket = (callback) =>
 // 구간이 바뀌었으면 처음 본 유저가 다음 시세를 계산해 저장 (트랜잭션이라 한 번만 반영)
 export const advanceMarket = (target, advance, initial) =>
   runTransaction(db, async (tx) => {
-    const stateRef = doc(db, "market", "state");
+    const stateRef = doc(db, "market", "byproducts");
     const snap = await tx.get(stateRef);
     if (!snap.exists()) {
       tx.set(stateRef, initial(target));
@@ -90,9 +90,9 @@ export const advanceMarket = (target, advance, initial) =>
     }
     const state = snap.data();
     if (state.window >= target) return;
-    const trades = await tx.get(doc(db, "market_trades", String(state.window)));
+    const trades = await tx.get(doc(db, "byproduct_trades", String(state.window)));
     tx.set(stateRef, advance(state, trades.exists() ? trades.data() : null, target));
   });
 
 export const recordTrade = (window, side, oreId, qty) =>
-  setDoc(doc(db, "market_trades", String(window)), { [side]: { [oreId]: increment(qty) } }, { merge: true });
+  setDoc(doc(db, "byproduct_trades", String(window)), { [side]: { [oreId]: increment(qty) } }, { merge: true });

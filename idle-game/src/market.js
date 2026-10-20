@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { ORES } from "./data";
+import { BYPRODUCTS, BYPRODUCT_PRICE } from "./data";
 import { advanceMarket, firebaseEnabled, recordTrade, watchMarket } from "./firebase";
 
-// 광석 시세: 20분마다 그동안의 매수·매도량으로 다음 가격을 정해요.
-// 많이 팔린 광물은 떨어지고, 안 팔린 광물은 조금씩 오르고, 기본가 쪽으로 천천히 되돌아가요.
+// 부산물 시세: 모두 같은 가격에서 시작해서, 20분마다 그동안 팔린 양으로 다음 가격을 정해요.
+// 평균보다 많이 팔린 부산물은 떨어지고, 덜 팔린 부산물은 올라요. 기본가 쪽으로 천천히 되돌아가기도 해요.
 export const WINDOW_MS = 20 * 60 * 1000;
-export const BUY_SPREAD = 1.05;
 const LIQUIDITY = 30;
 const HISTORY = 24;
 const MAX_STEPS = 500;
@@ -22,31 +21,28 @@ const seeded = (seed) => () => {
 
 export const initialMarket = (window) => ({
   window,
-  prices: Object.fromEntries(ORES.map((o) => [o.id, o.price])),
-  history: Object.fromEntries(ORES.map((o) => [o.id, [o.price]])),
+  prices: Object.fromEntries(BYPRODUCTS.map((b) => [b.id, BYPRODUCT_PRICE])),
+  history: Object.fromEntries(BYPRODUCTS.map((b) => [b.id, [BYPRODUCT_PRICE]])),
 });
 
 const step = (state, trades, nextWindow, npc) => {
   const rand = seeded(nextWindow * 9973);
+  const sells = {};
+  for (const b of BYPRODUCTS) {
+    sells[b.id] = (trades?.sells?.[b.id] || 0) + (npc ? Math.floor(rand() * 40) : 0); // 혼자 할 때는 가상의 광부들이 팔아요
+  }
+  const mean = Object.values(sells).reduce((a, v) => a + v, 0) / BYPRODUCTS.length;
   const prices = {};
   const history = {};
-  for (const o of ORES) {
-    const price = state.prices?.[o.id] ?? o.price;
-    let buys = trades?.buys?.[o.id] || 0;
-    let sells = trades?.sells?.[o.id] || 0;
-    if (npc) {
-      // 혼자 할 때는 가상의 다른 광부들이 사고팔아요
-      buys += Math.floor(rand() * 20);
-      sells += Math.floor(rand() * 20);
-    }
-    const pressure = (buys - sells) / (LIQUIDITY + buys + sells);
-    const scarcity = sells === 0 ? 0.04 : 0;
-    const noise = (rand() - 0.5) * 0.16;
-    const reversion = 0.08 * Math.log(o.price / price);
-    const next = Math.min(o.price * 5, Math.max(o.price * 0.2, price * Math.exp(0.7 * pressure + scarcity + noise + reversion)));
-    const rounded = next >= 100 ? Math.round(next) : Math.round(next * 100) / 100;
-    prices[o.id] = rounded;
-    history[o.id] = [...(state.history?.[o.id] || []), rounded].slice(-HISTORY);
+  for (const b of BYPRODUCTS) {
+    const price = state.prices?.[b.id] ?? BYPRODUCT_PRICE;
+    const pressure = (mean - sells[b.id]) / (LIQUIDITY + mean + sells[b.id]);
+    const noise = (rand() - 0.5) * 0.12;
+    const reversion = 0.08 * Math.log(BYPRODUCT_PRICE / price);
+    const next = Math.min(BYPRODUCT_PRICE * 5, Math.max(BYPRODUCT_PRICE * 0.2, price * Math.exp(0.8 * pressure + noise + reversion)));
+    const rounded = Math.round(next * 10) / 10;
+    prices[b.id] = rounded;
+    history[b.id] = [...(state.history?.[b.id] || []), rounded].slice(-HISTORY);
   }
   return { window: nextWindow, prices, history };
 };
@@ -64,8 +60,8 @@ export const advanceTo = (state, trades, target, npc = false) => {
   return s.window < target ? { ...s, window: target } : s;
 };
 
-const LOCAL_STATE = "ore-market-state";
-const LOCAL_TRADES = "ore-market-trades";
+const LOCAL_STATE = "byproduct-market-state";
+const LOCAL_TRADES = "byproduct-market-trades";
 const readJson = (key) => {
   try {
     return JSON.parse(localStorage.getItem(key));
@@ -114,18 +110,18 @@ export function useMarket(uid) {
     }
   }, [online, current, state]);
 
-  const record = (side, oreId, qty) => {
+  const recordSell = (id, qty) => {
     if (online) {
-      recordTrade(current, side, oreId, qty).catch((e) => console.error("거래 기록 실패", e));
+      recordTrade(current, "sells", id, qty).catch((e) => console.error("거래 기록 실패", e));
       return;
     }
     const saved = readJson(LOCAL_TRADES);
-    const trades = saved?.window === current ? saved : { window: current, buys: {}, sells: {} };
-    trades[side][oreId] = (trades[side][oreId] || 0) + qty;
+    const trades = saved?.window === current ? saved : { window: current, sells: {} };
+    trades.sells[id] = (trades.sells[id] || 0) + qty;
     writeJson(LOCAL_TRADES, trades);
   };
 
-  const priceOf = (oreId) => state?.prices?.[oreId] ?? ORES.find((o) => o.id === oreId).price;
+  const priceOf = (id) => state?.prices?.[id] ?? BYPRODUCT_PRICE;
 
-  return { state: state || null, online, now, nextAt: (current + 1) * WINDOW_MS, record, priceOf };
+  return { state: state || null, online, now, nextAt: (current + 1) * WINDOW_MS, recordSell, priceOf };
 }

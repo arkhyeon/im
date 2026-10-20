@@ -28,7 +28,7 @@ export function CoinIcon({ size = 28 }) {
 }
 
 // 광석 덩어리. damage(0~1)가 클수록 금이 더 많이 가요.
-export function OreRock({ ore, damage = 0 }) {
+export function OreRock({ ore, damage = 0, boss = false }) {
   const [top, light, left, right, front] = ore.faces;
   const [v1, v2, v3] = ore.vein;
   const crack = (min) => ({ opacity: damage > min ? 1 : 0, transition: "opacity .15s" });
@@ -62,10 +62,36 @@ export function OreRock({ ore, damage = 0 }) {
         <path style={crack(0.65)} d="M176 100 L156 108 L150 124 L132 130 L128 146" />
         <path style={crack(0.85)} d="M70 80 L84 96 L80 112 L94 124 L90 142" />
       </g>
-      <Sparkle x={104} y={74} />
-      <Sparkle x={62} y={92} delay={0.5} />
-      <Sparkle x={146} y={72} delay={1} />
-      <Sparkle x={126} y={118} delay={0.3} />
+      {boss ? (
+        <g className="boss-face">
+          <path d="M70 26 L78 8 L90 22 L100 4 L110 22 L122 8 L130 26 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="2" />
+          <path d="M62 78 L88 88 M138 78 L112 88" stroke="#1a0a12" strokeWidth="5" strokeLinecap="round" />
+          <ellipse cx="80" cy="98" rx="10" ry="8" fill="#fff" />
+          <ellipse cx="120" cy="98" rx="10" ry="8" fill="#fff" />
+          <circle cx="82" cy="99" r="4.5" fill="#d50000" />
+          <circle cx="118" cy="99" r="4.5" fill="#d50000" />
+          <path d="M78 124 L86 118 L94 124 L100 118 L106 124 L114 118 L122 124" stroke="#1a0a12" strokeWidth="4" fill="none" strokeLinejoin="round" />
+        </g>
+      ) : (
+        <>
+          <Sparkle x={104} y={74} />
+          <Sparkle x={62} y={92} delay={0.5} />
+          <Sparkle x={146} y={72} delay={1} />
+          <Sparkle x={126} y={118} delay={0.3} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// 시장에서 파는 부산물
+export function ByproductIcon({ item, size = 28 }) {
+  return (
+    <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
+      <path d="M6 20 Q4 11 12 7 Q20 3 26 10 Q31 17 25 24 Q18 30 10 27 Q6 25 6 20 Z" fill={item.color} stroke="rgba(0,0,0,.4)" strokeWidth="1.5" />
+      <path d="M11 12 Q15 8 20 10" stroke="rgba(255,255,255,.7)" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      <circle cx="18" cy="20" r="2" fill="rgba(0,0,0,.18)" />
+      <circle cx="12" cy="19" r="1.4" fill="rgba(0,0,0,.18)" />
     </svg>
   );
 }
@@ -84,57 +110,119 @@ export function OreItemIcon({ ore, size = 28 }) {
   );
 }
 
-// ---------- 일꾼 ----------
+// ---------- 광부 (미소녀) ----------
+const BACK_HAIR = {
+  long: <path d="M15.5 22 Q13 44 19 50 L41 50 Q47 44 44.5 22 Z" />,
+  ponytail: <path d="M41 15 Q57 17 52 39 Q50 30 44 25 Z" />,
+  twin: (
+    <>
+      <path d="M17 17 Q4 28 10 47 Q14 36 19 27 Z" />
+      <path d="M43 17 Q56 28 50 47 Q46 36 41 27 Z" />
+    </>
+  ),
+  bob: <path d="M15.5 22 Q15 37 21 38 L39 38 Q45 37 44.5 22 Z" />,
+  braid: (
+    <>
+      <circle cx="43" cy="31" r="3.3" />
+      <circle cx="44" cy="37" r="3.1" />
+      <circle cx="44.5" cy="43" r="2.8" />
+    </>
+  ),
+  bun: <circle cx="30" cy="7" r="5.5" />,
+};
+
 export function WorkerIcon({ look, rarity = 0, size = 44, delay = 0, still = false }) {
-  const has = (key) => look.extra?.includes(key);
-  const skin = look.skin || "#f2c9a0";
+  const has = (key) => look.extra?.split(" ").includes(key);
+  const skin = look.skin || "#ffe3cf";
   const accent = RARITIES[rarity].color;
-  const golemHead = has("golem");
   const classes = [has("spirit") ? "spirit-glow" : "", rarity >= 8 ? "rainbow-glow" : ""].join(" ");
   return (
     <svg viewBox="0 0 60 60" width={size} height={size} className={classes} aria-hidden="true">
       <g className={still ? "" : "bob"} style={{ animationDelay: `${delay}s` }}>
-        {has("cape") && <path d="M17 32 L13 56 L45 56 L41 32 Z" fill={accent} opacity=".85" />}
-        <g className={still ? "" : "swing"} style={{ transformOrigin: "40px 38px", animationDelay: `${delay}s` }}>
-          <rect x="38.5" y="12" width="3" height="28" rx="1.5" fill={rarity >= 4 ? "#4a148c" : "#8b5a2b"} />
-          <path d="M28 15 Q40 6 52 15 L50 18 Q40 11 30 18 Z" fill={rarity ? accent : "#b0bec5"} />
+        {has("cape") && <path d="M19 36 L12 57 L48 57 L41 36 Z" fill={accent} opacity=".85" />}
+        {has("tail") && <path d="M40 49 Q55 51 55 40 Q57 33 52 31 Q53 42 40 45 Z" fill={look.hair} />}
+        <g fill={look.hair}>
+          <circle cx="30" cy="22" r="14.5" />
+          {BACK_HAIR[look.style]}
         </g>
-        <rect x="21" y="48" width="6" height="8" rx="2" fill="#4e342e" />
-        <rect x="31" y="48" width="6" height="8" rx="2" fill="#4e342e" />
-        <rect x="18" y="32" width="22" height="19" rx="6" fill={look.body} />
-        <rect x="26" y="32" width="6" height="19" fill="rgba(0,0,0,.18)" />
+        {look.style === "twin" && (
+          <>
+            <circle cx="17.5" cy="18" r="2.4" fill={look.accent} />
+            <circle cx="42.5" cy="18" r="2.4" fill={look.accent} />
+          </>
+        )}
+        <g className={still ? "" : "swing"} style={{ transformOrigin: "42px 42px", animationDelay: `${delay}s` }}>
+          <rect x="41" y="20" width="2.6" height="25" rx="1.3" fill={rarity >= 4 ? "#4a148c" : "#8b5a2b"} />
+          <path d="M32 22 Q42 13 53 21 L51 24 Q42 18 34 25 Z" fill={rarity ? accent : "#b0bec5"} />
+        </g>
+        <rect x="23.5" y="49" width="5" height="7" rx="2" fill={skin} />
+        <rect x="31.5" y="49" width="5" height="7" rx="2" fill={skin} />
+        <rect x="23" y="54.5" width="6" height="3" rx="1.5" fill="#5d4037" />
+        <rect x="31" y="54.5" width="6" height="3" rx="1.5" fill="#5d4037" />
+        <path d="M21.5 35 Q30 32 38.5 35 L43 51 Q30 55 17 51 Z" fill={look.outfit} />
+        <path d="M17.5 49.5 Q30 53 42.5 49.5" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" fill="none" />
+        <path d="M26.5 35 L30 38.5 L33.5 35" fill="none" stroke={look.accent} strokeWidth="1.8" />
+        <path d="M27 39.5 L30 41 L33 39.5 L30 42.5 Z" fill={look.accent} />
         {has("dynamite") && (
           <>
-            <rect x="19" y="41" width="3" height="8" rx="1" fill="#d32f2f" />
-            <rect x="23" y="41" width="3" height="8" rx="1" fill="#d32f2f" />
+            <rect x="20" y="43" width="2.6" height="6" rx="1" fill="#d32f2f" />
+            <rect x="23.2" y="43" width="2.6" height="6" rx="1" fill="#d32f2f" />
           </>
         )}
-        {golemHead ? <rect x="19" y="15" width="20" height="19" rx="4" fill={skin} /> : <circle cx="29" cy="25" r="10" fill={skin} />}
-        <circle cx="25" cy="26" r="1.4" fill={golemHead ? "#fff59d" : "#333"} />
-        <circle cx="33" cy="26" r="1.4" fill={golemHead ? "#fff59d" : "#333"} />
-        {has("beard") ? (
-          <path d="M20 26 Q29 42 38 26 Q34 31 29 31 Q24 31 20 26 Z" fill={rarity >= 6 ? "#fff" : "#cfd8dc"} />
-        ) : (
-          <path d="M26 30 Q29 32 32 30" stroke="#a0522d" strokeWidth="1.4" fill="none" />
-        )}
-        {has("wizard") ? (
+        {has("golem") && (
           <>
-            <path d="M17 21 L29 0 L41 21 Z" fill={look.helmet} />
-            <rect x="15" y="19" width="28" height="3" rx="1.5" fill="rgba(0,0,0,.25)" />
-          </>
-        ) : (
-          <>
-            <path d="M18 23 A11 11 0 0 1 40 23 Z" fill={look.helmet} />
-            <rect x="16" y="22" width="26" height="3" rx="1.5" fill="rgba(0,0,0,.2)" />
-            <circle cx="29" cy="16" r="2.6" fill="#fff59d" />
+            <path d="M15 40 L20 33.5 L24 38 L19 42 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
+            <path d="M45 40 L40 33.5 L36 38 L41 42 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
           </>
         )}
-        {has("horns") && <path d="M18 18 Q12 10 15 4 Q18 12 22 15 Z M40 18 Q46 10 43 4 Q40 12 36 15 Z" fill="#fff3e0" />}
-        {has("crown") && <path d="M21 13 L24 6 L29 11 L34 6 L37 13 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />}
-        {has("halo") && <ellipse cx="29" cy="5" rx="10" ry="3" fill="none" stroke="#fff59d" strokeWidth="2.2" />}
-        {has("spirit") && <path d="M22 10 L25 4 L29 8 L33 4 L36 10 Z" fill={accent} />}
-        {rarity >= 4 && <Sparkle x={46} y={8} size={0.5} delay={delay + 0.4} color={accent} />}
-        {rarity >= 6 && <Sparkle x={10} y={30} size={0.45} delay={delay + 0.9} color={accent} />}
+        <circle cx="18.5" cy="44" r="2.4" fill={skin} />
+        <circle cx="41.5" cy="43" r="2.4" fill={skin} />
+        <circle cx="30" cy="23" r="13" fill={skin} />
+        <ellipse cx="25" cy="25.5" rx="2.6" ry="3.4" fill={look.eyes} />
+        <ellipse cx="35" cy="25.5" rx="2.6" ry="3.4" fill={look.eyes} />
+        <circle cx="24.1" cy="24.2" r="1.05" fill="#fff" />
+        <circle cx="34.1" cy="24.2" r="1.05" fill="#fff" />
+        <circle cx="25.8" cy="27.2" r="0.5" fill="#fff" />
+        <circle cx="35.8" cy="27.2" r="0.5" fill="#fff" />
+        <ellipse cx="21.5" cy="29.5" rx="2.3" ry="1.2" fill="#ff8a80" opacity=".55" />
+        <ellipse cx="38.5" cy="29.5" rx="2.3" ry="1.2" fill="#ff8a80" opacity=".55" />
+        <path d="M28.6 30.6 Q30 31.9 31.4 30.6" stroke="#c2185b" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        <path d="M17 24 Q16 10 30 9 Q44 10 43 24 Q41 17 37.5 16 Q35.5 20.5 31.5 17 Q28.5 21 24.5 17 Q20.5 18 17 24 Z" fill={look.hair} />
+        {has("helmet") && (
+          <>
+            <path d="M16.5 17 A13.5 11 0 0 1 43.5 17 Z" fill={look.accent} />
+            <rect x="15" y="15.5" width="30" height="3" rx="1.5" fill="rgba(0,0,0,.22)" />
+            <circle cx="30" cy="10.5" r="2.4" fill="#fff59d" />
+          </>
+        )}
+        {has("goggles") && (
+          <>
+            <rect x="17" y="13" width="26" height="2.6" fill="#5d4037" />
+            <circle cx="24" cy="14.3" r="3.6" fill={look.accent} stroke="#5d4037" strokeWidth="1.4" />
+            <circle cx="36" cy="14.3" r="3.6" fill={look.accent} stroke="#5d4037" strokeWidth="1.4" />
+          </>
+        )}
+        {has("wizard") && (
+          <>
+            <path d="M16 15 L33 -3 L44 15 Z" fill={look.outfit} />
+            <ellipse cx="30" cy="15" rx="17" ry="3" fill={look.outfit} />
+            <Sparkle x={31} y={7} size={0.35} delay={delay} color="#fff59d" />
+          </>
+        )}
+        {has("horns") && <path d="M19 12 Q13 4 16.5 -0.5 Q19.5 7 23 10 Z M41 12 Q47 4 43.5 -0.5 Q40.5 7 37 10 Z" fill="#fff3e0" stroke="#bcaaa4" strokeWidth=".8" />}
+        {has("crown") && <path d="M23 10 L25 3.5 L30 7.5 L35 3.5 L37 10 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />}
+        {has("golem") && <path d="M38 10 L41 4.5 L44 10 L41 13.5 Z" fill={look.accent} stroke="#fff" strokeWidth=".8" />}
+        {has("spirit") && (
+          <g fill={accent}>
+            <circle cx="41" cy="11" r="2.2" />
+            <circle cx="44" cy="9" r="1.6" />
+            <circle cx="44" cy="13" r="1.6" />
+            <circle cx="38" cy="9" r="1.6" />
+          </g>
+        )}
+        {has("halo") && <ellipse cx="30" cy="2.5" rx="10" ry="2.6" fill="none" stroke="#fff59d" strokeWidth="2" />}
+        {rarity >= 4 && <Sparkle x={51} y={9} size={0.5} delay={delay + 0.4} color={accent} />}
+        {rarity >= 6 && <Sparkle x={8} y={32} size={0.45} delay={delay + 0.9} color={accent} />}
       </g>
     </svg>
   );
@@ -218,13 +306,14 @@ const EQUIP_SHAPES = {
 };
 
 export function EquipIcon({ slot, level, size = 44 }) {
-  const material = Math.min(Math.max(level - 1, 0), 99) / 10 | 0;
+  const material = Math.min(MATERIALS.length - 1, Math.floor(Math.max(level - 1, 0) / 100));
+  const plus = level ? Math.floor(((level - 1) % 100) / 10) : 0;
   const color = MATERIALS[material].color;
   return (
     <svg viewBox="0 0 60 60" width={size} height={size} className={material >= 8 ? "equip-glow" : ""} aria-hidden="true">
       {EQUIP_SHAPES[slot](color)}
-      {material >= 5 && <Sparkle x={50} y={10} size={0.5} color="#fffbe0" />}
-      {material >= 7 && <Sparkle x={10} y={48} size={0.45} delay={0.6} color={color} />}
+      {(material >= 5 || plus >= 5) && <Sparkle x={50} y={10} size={0.5} color="#fffbe0" />}
+      {(material >= 7 || plus >= 8) && <Sparkle x={10} y={48} size={0.45} delay={0.6} color={color} />}
     </svg>
   );
 }

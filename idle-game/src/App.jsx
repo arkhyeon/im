@@ -3,10 +3,12 @@ import { firebaseEnabled, loadPlayer, login, logout, savePlayer, watchAuth, watc
 import {
   AD_TICKET,
   BAT,
-  BREAKS_TO_UNLOCK,
+  BOSS,
+  BYPRODUCTS,
+  CHARM_GACHA,
+  CHARM_MERGE,
   CHARM_SLOTS,
   EQUIPMENT,
-  MATERIALS,
   MAX_LEVEL,
   MAX_OFFLINE_SEC,
   MERGE,
@@ -15,39 +17,50 @@ import {
   QUESTS,
   RARITIES,
   RUSH,
+  TAP_GOLD,
   TICKETS,
+  WORKER_GOLD,
   WORKERS,
 } from "./data";
 import {
+  addGold,
   applyDamage,
   attendanceRewardOf,
+  bossHpOf,
   bumpDaily,
+  canChallengeBoss,
+  charmSellOf,
   charmTypeOf,
   dailyOf,
   equipCostOf,
+  equipNameOf,
   fmt,
   incomeOf,
   isOreUnlocked,
-  materialOf,
+  makeCharm,
   nextStreakOf,
   normalize,
   oreIndexOf,
+  pickCharmMaterials,
   pickMergeMaterials,
   pickWorker,
+  plusOf,
+  prestigeCostOf,
   prestigeMult,
   questRewardOf,
+  rarityCountOf,
   rebirthOf,
-  rollMerge,
+  rollCharm,
+  rollMergeOutcome,
   rollWorker,
+  setTierOf,
   statsOf,
   stonesFor,
-  ticketCostOf,
   toSave,
   todayKey,
-  addGold,
 } from "./game";
-import { useMarket, BUY_SPREAD } from "./market";
-import { BatIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon } from "./art";
+import { useMarket } from "./market";
+import { BatIcon, ByproductIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon } from "./art";
 import { CharmsPanel, EquipPanel, MarketPanel, MissionsPanel, PrestigePanel, WorkersPanel } from "./panels";
 
 const MAX_WALKERS = 8;
@@ -93,10 +106,61 @@ const writeLocal = (uid, data) => {
 const offlineSecSince = (time) => Math.min(Math.max((Date.now() - time) / 1000, 0), MAX_OFFLINE_SEC);
 const randoms = (n = 48) => Array.from({ length: n }, Math.random);
 
+// PC에서도 마우스로 끌어서 스크롤 (광석 화면은 제외)
+function useDragScroll() {
+  useEffect(() => {
+    let drag = null;
+    const scrollableOf = (el) => {
+      for (; el && el !== document.body; el = el.parentElement) {
+        const style = getComputedStyle(el);
+        const y = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight;
+        const x = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth;
+        if (x || y) return el;
+      }
+      return document.scrollingElement;
+    };
+    const down = (e) => {
+      if (e.pointerType !== "mouse" || e.button !== 0 || e.target.closest(".scene, input, .overlay")) return;
+      const el = scrollableOf(e.target);
+      drag = { el, x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, moved: false };
+    };
+    const move = (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      drag.el.scrollLeft = drag.left - dx;
+      drag.el.scrollTop = drag.top - dy;
+    };
+    const up = () => {
+      if (drag?.moved) {
+        // 끌어서 스크롤한 뒤에 버튼이 눌리지 않게
+        const block = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+        };
+        window.addEventListener("click", block, true);
+        setTimeout(() => window.removeEventListener("click", block, true), 0);
+      }
+      drag = null;
+    };
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
+}
+
 export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState(null);
   const [guest, setGuest] = useState(false);
+  useDragScroll();
 
   useEffect(
     () =>
@@ -133,9 +197,14 @@ function Login({ onGuest }) {
     <div className="game login">
       <div className="login-art">
         <OreRock ore={ORES[4]} />
+        <div className="login-girls">
+          {[WORKERS[0], WORKERS[16], WORKERS[24]].map((w) => (
+            <WorkerIcon key={w.id} look={w.look} rarity={w.rarity} size={64} />
+          ))}
+        </div>
       </div>
       <h1 className="title">광석 캐기</h1>
-      <p className="subtitle">광석을 부수고, 광부를 모으고, 시세를 읽어 랭킹 1위를 노려 보세요</p>
+      <p className="subtitle">광석을 부수고, 보스를 잡고, 광부 소녀들을 모아 보세요</p>
       {firebaseEnabled && (
         <button className="google-btn" onClick={handleLogin} disabled={busy}>
           <GoogleLogo />
@@ -160,6 +229,7 @@ function Game({ user, onExit }) {
   const [askNickname, setAskNickname] = useState(false);
   const [top3, setTop3] = useState([]);
   const [rush, setRush] = useState({ gauge: 0, until: 0, duration: RUSH.duration });
+  const [boss, setBoss] = useState(null);
   const [watchingAd, setWatchingAd] = useState(null);
   const [fx, setFx] = useState([]);
   const [toasts, setToasts] = useState([]);
@@ -176,11 +246,15 @@ function Game({ user, onExit }) {
   gameRef.current = game;
   const rushRef = useRef(rush);
   rushRef.current = rush;
+  const bossRef = useRef(boss);
+  bossRef.current = boss;
   const fxId = useRef(0);
   const sceneRef = useRef(null);
   const displayName = useRef(user?.displayName);
   const lastBreakSeq = useRef(0);
   const lastShatter = useRef(0);
+  // 뽑기·합성 결과는 연출이 끝날 때 반영해서 뒤 화면에 미리 보이지 않게
+  const pending = useRef(null);
 
   // 로컬 저장본과 서버 저장본 중 더 최근 것을 불러옴
   useEffect(() => {
@@ -214,7 +288,19 @@ function Game({ user, onExit }) {
 
   useEffect(() => watchTop3(setTop3), []);
 
-  // 0.1초마다 광부들이 광석에 피해를 줌 + 골드 러시 게이지 감소/종료
+  const showBanner = (title, sub, color = "#ffd54a") => {
+    const id = Date.now() + Math.random();
+    setBanner({ id, title, sub, color });
+    setTimeout(() => setBanner((b) => (b?.id === id ? null : b)), 2400);
+  };
+
+  const showToast = (content, color) => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-3), { id, content, color }]);
+    setTimeout(() => setToasts((t) => t.filter((item) => item.id !== id)), 2600);
+  };
+
+  // 0.1초마다 광부들이 광석을 캠 (보스전 중에는 골드만) + 골드 러시·보스 시간 체크
   useEffect(() => {
     let last = Date.now();
     const id = setInterval(() => {
@@ -222,16 +308,24 @@ function Game({ user, onExit }) {
       const dt = Math.min((now - last) / 1000, 1);
       last = now;
       const rushing = rushRef.current.until > now;
+      const fighting = Boolean(bossRef.current);
       const rolls = randoms();
       setGame((g) => {
         const st = statsOf(g);
         const damage = st.workerPower * (rushing ? RUSH.rateMult : 1) * dt;
-        return damage > 0 ? applyDamage(g, damage, st, rolls) : g;
+        if (damage <= 0) return g;
+        if (fighting) return addGold(g, damage * ORES[oreIndexOf(g.ore)].mult * st.goldMult * WORKER_GOLD);
+        return applyDamage(g, damage, st, rolls, WORKER_GOLD);
       });
       setRush((r) => {
         if (r.until) return r.until <= now ? { ...r, gauge: 0, until: 0 } : r;
         return r.gauge > 0 ? { ...r, gauge: Math.max(0, r.gauge - RUSH.decay * dt) } : r;
       });
+      if (bossRef.current && now > bossRef.current.until) {
+        bossRef.current = null;
+        setBoss(null);
+        showBanner("보스가 도망갔어요", "곡괭이를 강화하고 다시 도전해 보세요", "#ff8a80");
+      }
     }, 100);
     return () => clearInterval(id);
   }, []);
@@ -273,7 +367,7 @@ function Game({ user, onExit }) {
     let timer;
     const schedule = () => {
       timer = setTimeout(() => {
-        setBat({ id: Date.now(), top: 12 + Math.random() * 30, fromLeft: Math.random() < 0.5 });
+        setBat({ id: Date.now(), top: 18 + Math.random() * 26, fromLeft: Math.random() < 0.5 });
         timer = setTimeout(() => {
           setBat(null);
           schedule();
@@ -284,27 +378,10 @@ function Game({ user, onExit }) {
     return () => clearTimeout(timer);
   }, []);
 
-  const showBanner = (title, sub, color = "#ffd54a") => {
-    const id = Date.now() + Math.random();
-    setBanner({ id, title, sub, color });
-    setTimeout(() => setBanner((b) => (b?.id === id ? null : b)), 2400);
-  };
-
-  const showToast = (content, color) => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-3), { id, content, color }]);
-    setTimeout(() => setToasts((t) => t.filter((item) => item.id !== id)), 2600);
-  };
-
   const addFx = (items, ms = 900) => {
     const ids = new Set(items.map((item) => item.id));
     setFx((f) => [...f, ...items]);
     setTimeout(() => setFx((f) => f.filter((item) => !ids.has(item.id))), ms);
-  };
-
-  const sceneCenter = () => {
-    const rect = sceneRef.current?.getBoundingClientRect();
-    return rect ? { x: rect.width / 2, y: 136 } : { x: 180, y: 136 };
   };
 
   // 광석이 부서지면 파편 + 보상 표시
@@ -312,25 +389,16 @@ function Game({ user, onExit }) {
     const lb = game.lastBreak;
     if (!lb || lb.seq === lastBreakSeq.current) return;
     lastBreakSeq.current = lb.seq;
-    lb.charms.forEach((c) => {
-      showToast(
-        <>
-          <CharmIcon type={c.type} rarity={c.rarity} size={26} /> {RARITIES[c.rarity].name} {charmTypeOf(c).name} 획득!
-        </>,
-        RARITIES[c.rarity].color
-      );
-      if (c.rarity >= 3) showBanner("귀한 장신구!", `${RARITIES[c.rarity].name} ${charmTypeOf(c).name}`, RARITIES[c.rarity].color);
-    });
-    if (lb.unlocked) showBanner("새 광석 해금!", ORES.find((o) => o.id === lb.unlocked).name, "#7ef9ff");
     const now = Date.now();
     if (now - lastShatter.current < 400) return;
     lastShatter.current = now;
     const ore = ORES.find((o) => o.id === lb.ore);
-    const { x, y } = sceneCenter();
-    const items = [
-      { id: ++fxId.current, type: "break", x, y: y - 40, text: `${lb.breaks > 1 ? `${lb.breaks}번 ` : ""}파괴! +${fmt(lb.bonus)}` },
-      { id: ++fxId.current, type: "drop", x: x + 50, y: y + 20, ore, text: `+${fmt(lb.items)}` },
-    ];
+    const width = sceneRef.current?.clientWidth || 360;
+    const x = width / 2;
+    const y = 150;
+    const [itemId, qty] = Object.entries(lb.items)[0] || [];
+    const items = [{ id: ++fxId.current, type: "break", x, y: y - 40, text: `${lb.breaks > 1 ? `${lb.breaks}번 ` : ""}파괴! +${fmt(lb.bonus)}` }];
+    if (itemId) items.push({ id: ++fxId.current, type: "drop", x: x + 50, y: y + 20, item: BYPRODUCTS.find((b) => b.id === itemId), text: `+${fmt(qty)}` });
     for (let i = 0; i < 10; i++) {
       const angle = Math.random() * Math.PI * 2;
       const dist = 60 + Math.random() * 70;
@@ -365,13 +433,24 @@ function Game({ user, onExit }) {
     setGame((g) => bumpDaily(g, "rushes"));
   };
 
+  const startBoss = () => {
+    const g = gameRef.current;
+    if (!canChallengeBoss(g) || bossRef.current) return;
+    const max = bossHpOf(g.oreLevel);
+    const next = { level: g.oreLevel, hp: max, max, until: Date.now() + BOSS.seconds * 1000 };
+    bossRef.current = next;
+    setBoss(next);
+    showBanner(`${ORES[g.oreLevel].name} 광석 보스 등장!`, `${BOSS.seconds}초 안에 탭으로 부수세요`, "#ff5252");
+  };
+
   const tap = (e) => {
     const rect = sceneRef.current.getBoundingClientRect();
-    const st = statsOf(gameRef.current);
+    const g = gameRef.current;
+    const st = statsOf(g);
     const isRushing = rushRef.current.until > Date.now();
     const crit = Math.random() < st.critChance;
     const damage = st.tapDamage * (crit ? st.critMult : 1) * (isRushing ? st.rushTapMult : 1);
-    const gain = damage * ORES[oreIndexOf(gameRef.current.ore)].mult * st.goldMult;
+    const gain = damage * ORES[oreIndexOf(g.ore)].mult * st.goldMult * TAP_GOLD;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const items = [{ id: ++fxId.current, type: crit ? "crit" : "text", x, y, text: crit ? `치명타! +${fmt(gain)}` : `+${fmt(gain)}`, big: isRushing }];
@@ -382,8 +461,30 @@ function Game({ user, onExit }) {
     }
     addFx(items);
     setHit((h) => h + 1);
-    const rolls = randoms();
-    setGame((g) => applyDamage(g, damage, statsOf(g), rolls));
+
+    const fight = bossRef.current;
+    if (fight) {
+      setGame((prev) => addGold(prev, gain));
+      const hp = fight.hp - damage;
+      if (hp > 0) {
+        bossRef.current = { ...fight, hp };
+        setBoss(bossRef.current);
+      } else {
+        // 보스 처치: 다음 광석 해금 + 큰 보상
+        bossRef.current = null;
+        setBoss(null);
+        const target = fight.level + 1;
+        const reward = fight.max * ORES[fight.level].mult * st.goldMult * BOSS.rewardMult;
+        setGame((prev) =>
+          addGold({ ...prev, oreLevel: Math.max(prev.oreLevel, target), ore: ORES[target].id, oreDamage: 0 }, reward)
+        );
+        showBanner("보스 처치!", `${ORES[target].name} 광석 해금 · 골드 +${fmt(reward)}`, ORES[target].vein[1]);
+      }
+    } else {
+      const rolls = randoms();
+      setGame((prev) => applyDamage(prev, damage, statsOf(prev), rolls, TAP_GOLD));
+    }
+
     if (isRushing) return;
     const gauge = rushRef.current.gauge + RUSH.perTap;
     if (gauge >= 1) startRush(st.rushDuration);
@@ -399,7 +500,7 @@ function Game({ user, onExit }) {
       startRush(statsOf(gameRef.current).rushDuration);
       return;
     }
-    const reward = Math.max(500, incomeOf(gameRef.current) * 90);
+    const reward = Math.max(500, incomeOf(gameRef.current) * 60 + statsOf(gameRef.current).tapDamage * ore.mult * TAP_GOLD * 30);
     addFx([{ id: ++fxId.current, type: "text", x: e.clientX - rect.left, y: e.clientY - rect.top, text: `+${fmt(reward)}`, big: true }]);
     showBanner("황금 박쥐 포획!", `골드 +${fmt(reward)}`);
     setGame((g) => addGold(g, reward));
@@ -407,47 +508,66 @@ function Game({ user, onExit }) {
 
   const selectOre = (id) => {
     const index = ORES.findIndex((o) => o.id === id);
-    if (!isOreUnlocked(gameRef.current, index)) return;
+    if (bossRef.current || !isOreUnlocked(gameRef.current, index)) return;
     setGame((g) => (g.ore === id ? g : { ...g, ore: id, oreDamage: 0 }));
   };
 
-  const buyEquip = (slotId) => {
+  // count레벨을 한 번에 올림 (최대 버튼)
+  const buyEquip = (slotId, count) => {
     const slot = EQUIPMENT.find((e) => e.id === slotId);
-    const level = gameRef.current.equip[slotId];
-    if (level >= MAX_LEVEL || gameRef.current.gold < equipCostOf(slot, level)) return;
-    setGame((g) => {
-      const cost = equipCostOf(slot, g.equip[slotId]);
-      if (g.gold < cost || g.equip[slotId] >= MAX_LEVEL) return g;
-      return { ...g, gold: g.gold - cost, equip: { ...g.equip, [slotId]: g.equip[slotId] + 1 } };
-    });
-    const nextLevel = level + 1;
-    if (nextLevel % 10 === 1 && nextLevel > 1) {
-      showBanner(`${materialOf(nextLevel).name} ${slot.name}!`, "재질이 바뀌었어요", materialOf(nextLevel).color);
+    const g0 = gameRef.current;
+    let level = g0.equip[slotId];
+    let gold = g0.gold;
+    let bought = 0;
+    while (bought < count && level < MAX_LEVEL && gold >= equipCostOf(slot, level)) {
+      gold -= equipCostOf(slot, level);
+      level++;
+      bought++;
     }
-    const before = Math.floor(Math.min(...EQUIPMENT.map((e) => gameRef.current.equip[e.id])) / 10);
-    const after = Math.floor(Math.min(...EQUIPMENT.map((e) => (e.id === slotId ? nextLevel : gameRef.current.equip[e.id]))) / 10);
-    if (after > before) showBanner(`${MATERIALS[after - 1].name} 세트 완성!`, "골드 +20% · 치명타 확률 +1%", MATERIALS[after - 1].color);
+    if (!bought) return;
+    setGame((g) => (g.equip[slotId] !== g0.equip[slotId] || g.gold < g0.gold - gold ? g : { ...g, gold: g.gold - (g0.gold - gold), equip: { ...g.equip, [slotId]: level } }));
+    const before = g0.equip[slotId];
+    if (Math.floor(Math.max(before - 1, 0) / 100) < Math.floor((level - 1) / 100)) {
+      showBanner(equipNameOf(slot, level), "새 재질로 바뀌었어요!", "#7ef9ff");
+    } else if (plusOf(level) > plusOf(before) && bought > 0) {
+      showToast(`${equipNameOf(slot, level)} 달성`, "#ffd54a");
+    }
+    const tierBefore = setTierOf(g0.equip);
+    const tierAfter = setTierOf({ ...g0.equip, [slotId]: level });
+    if (tierAfter > tierBefore) showBanner(`장비 세트 ${tierAfter}단계!`, "골드와 치명타 확률이 올랐어요", "#9be7a0");
   };
 
-  // 뽑기: 빛기둥 연출 → 카드 공개 (좋은 등급일수록 연출이 길고 화려해요)
-  const showPull = (results, title, before) => {
+  // 뽑기 결과 공개 (연출이 끝나거나 탭하면)
+  const revealPull = () => {
+    if (pending.current) {
+      pending.current();
+      pending.current = null;
+    }
+    setPullResult((p) => (p && p.stage === "summon" ? { ...p, stage: "reveal" } : p));
+  };
+
+  const showPull = (kind, results, title, apply, before = {}) => {
     const id = Date.now();
     const best = Math.max(...results.map((w) => w.rarity));
+    pending.current = apply;
     setPullResult({
       id,
+      kind,
       title,
       best,
       stage: "summon",
-      results: results.map((w, i) => ({ ...w, isNew: !before[w.id] && results.findIndex((r) => r.id === w.id) === i })),
+      results: results.map((w, i) => ({ ...w, isNew: kind === "worker" && !before[w.id] && results.findIndex((r) => r.id === w.id) === i })),
     });
-    setTimeout(() => setPullResult((p) => (p?.id === id && p.stage === "summon" ? { ...p, stage: "reveal" } : p)), best >= 4 ? 1900 : 1000);
+    setTimeout(() => {
+      if (pending.current === apply) revealPull();
+    }, best >= 4 ? 1900 : 1000);
   };
 
   // free: 광고·출석 보상처럼 골드를 쓰지 않는 뽑기
   const pull = (ticket, times, free = null) => {
     const g0 = gameRef.current;
-    const cost = free ? 0 : ticketCostOf(ticket, g0.pulls[ticket.id] || 0, times);
-    if (g0.gold < cost) return;
+    const cost = free ? 0 : ticket.cost * times;
+    if (g0.gold < cost || pending.current) return;
     let pity = g0.pity;
     const results = Array.from({ length: times }, () => {
       let w = rollWorker(ticket);
@@ -458,39 +578,80 @@ function Game({ user, onExit }) {
       }
       return w;
     });
-    setGame((g) => {
-      if (g.gold < cost) return g;
-      const workers = { ...g.workers };
-      results.forEach((w) => {
-        workers[w.id] = (workers[w.id] || 0) + 1;
+    // 골드는 바로 내고, 광부는 공개될 때 들어와요
+    setGame((g) => bumpDaily({ ...g, gold: g.gold - cost, pity }, "pulls", times));
+    if (free === "ad") setGame((g) => bumpDaily(g, "ads"));
+    const apply = () =>
+      setGame((g) => {
+        const workers = { ...g.workers };
+        results.forEach((w) => (workers[w.id] = (workers[w.id] || 0) + 1));
+        return { ...g, workers };
       });
-      let next = { ...g, gold: g.gold - cost, workers, pity };
-      if (!free) next.pulls = { ...g.pulls, [ticket.id]: (g.pulls[ticket.id] || 0) + times };
-      next = bumpDaily(next, "pulls", times);
-      if (free === "ad") next = bumpDaily(next, "ads");
-      return next;
-    });
-    showPull(results, `${ticket.name} 결과`, g0.workers);
+    showPull("worker", results, `${ticket.name} 결과`, apply, g0.workers);
   };
 
-  const merge = (rarity) => {
+  const pullCharms = (times) => {
     const g0 = gameRef.current;
-    const materials = pickMergeMaterials(g0.workers, rarity);
-    if (!materials) return;
-    const { outcome, result } = rollMerge(rarity);
-    const refund = outcome === "fail" ? materials[Math.floor(Math.random() * materials.length)] : null;
-    const gained = result || refund;
-    setGame((g) => {
-      if (!pickMergeMaterials(g.workers, rarity)) return g;
-      const workers = { ...g.workers };
-      materials.forEach((w) => (workers[w.id] -= 1));
-      workers[gained.id] = (workers[gained.id] || 0) + 1;
-      Object.keys(workers).forEach((k) => !workers[k] && delete workers[k]);
-      return { ...g, workers };
-    });
+    const cost = CHARM_GACHA.cost * times;
+    if (g0.stones < cost || pending.current) return;
+    const results = Array.from({ length: times }, () => rollCharm(Math.random));
+    setGame((g) => ({ ...g, stones: g.stones - cost }));
+    showPull("charm", results, "장신구 뽑기 결과", () => setGame((g) => ({ ...g, charms: [...g.charms, ...results] })));
+  };
+
+  // 합성 연출 → 결과 공개 (all이면 가능한 만큼 연속 합성)
+  const showMerge = (kind, results, apply) => {
     const id = Date.now();
-    setMergeResult({ id, stage: "merging", materials, outcome, result, refund, isNew: result && !g0.workers[result.id] });
-    setTimeout(() => setMergeResult((m) => (m?.id === id ? { ...m, stage: "result" } : m)), 1500);
+    pending.current = apply;
+    setMergeResult({ id, kind, stage: "merging", results });
+    setTimeout(() => {
+      if (pending.current !== apply) return;
+      pending.current();
+      pending.current = null;
+      setMergeResult((m) => (m?.id === id ? { ...m, stage: "result" } : m));
+    }, 1500);
+  };
+
+  const mergeWorkers = (rarity, all) => {
+    if (pending.current) return;
+    const workers = { ...gameRef.current.workers };
+    const before = gameRef.current.workers;
+    const times = all ? Math.floor(rarityCountOf(workers, rarity) / MERGE.count) : 1;
+    const results = [];
+    for (let i = 0; i < times; i++) {
+      const mats = pickMergeMaterials(workers, rarity, MERGE.count);
+      if (!mats) break;
+      mats.forEach((w) => (workers[w.id] -= 1));
+      const outcome = rollMergeOutcome(MERGE, rarity);
+      const item = outcome === "fail" ? mats[Math.floor(Math.random() * mats.length)] : pickWorker(rarity + (outcome === "great" ? 2 : 1));
+      workers[item.id] = (workers[item.id] || 0) + 1;
+      results.push({ outcome, item, mats, isNew: outcome !== "fail" && !before[item.id] });
+    }
+    if (!results.length) return;
+    Object.keys(workers).forEach((k) => !workers[k] && delete workers[k]);
+    showMerge("worker", results, () => setGame((g) => ({ ...g, workers })));
+  };
+
+  const mergeCharms = (rarity, all) => {
+    if (pending.current) return;
+    let work = { charms: [...gameRef.current.charms], equipped: gameRef.current.equipped };
+    const results = [];
+    for (let i = 0; i < (all ? 999 : 1); i++) {
+      const mats = pickCharmMaterials(work, rarity, CHARM_MERGE.count);
+      if (!mats) break;
+      const used = new Set(mats.map((c) => c.uid));
+      work = { ...work, charms: work.charms.filter((c) => !used.has(c.uid)) };
+      const outcome = rollMergeOutcome(CHARM_MERGE, rarity);
+      const item =
+        outcome === "fail"
+          ? mats[Math.floor(Math.random() * mats.length)]
+          : makeCharm(mats[Math.floor(Math.random() * mats.length)].type, rarity + (outcome === "great" ? 2 : 1), Math.random);
+      work.charms.push(item);
+      results.push({ outcome, item, mats });
+    }
+    if (!results.length) return;
+    const { charms } = work;
+    showMerge("charm", results, () => setGame((g) => ({ ...g, charms })));
   };
 
   const equipCharm = (uid) =>
@@ -500,37 +661,18 @@ function Game({ user, onExit }) {
     setGame((g) => {
       const c = g.charms.find((item) => item.uid === uid);
       if (!c || g.equipped.includes(uid)) return g;
-      return { ...g, gold: g.gold + c.sell, charms: g.charms.filter((item) => item.uid !== uid) };
+      return { ...g, gold: g.gold + charmSellOf(c.rarity), charms: g.charms.filter((item) => item.uid !== uid) };
     });
-  const sellCharmsBelow = (maxRarity) => {
-    const g0 = gameRef.current;
-    const sold = new Set(g0.charms.filter((c) => c.rarity <= maxRarity && !g0.equipped.includes(c.uid)).map((c) => c.uid));
-    if (!sold.size) return;
-    const total = g0.charms.filter((c) => sold.has(c.uid)).reduce((sum, c) => sum + c.sell, 0);
-    setGame((g) => ({ ...g, gold: g.gold + total, charms: g.charms.filter((c) => !sold.has(c.uid)) }));
-    showToast(`장신구 ${sold.size}개 판매 +${fmt(total)}`, "#ffd54a");
-  };
 
   // 시장: 판 돈은 골드로만 들어가고 랭킹 점수(누적 채굴량)에는 안 들어가요
-  const marketSell = (oreId, qty) => {
-    const held = gameRef.current.oreItems[oreId] || 0;
+  const sellByproduct = (id, qty) => {
+    const held = gameRef.current.byproducts[id] || 0;
     const n = Math.min(qty, held);
     if (n < 1) return;
-    const price = market.priceOf(oreId);
-    setGame((g) => {
-      if ((g.oreItems[oreId] || 0) < n) return g;
-      return { ...g, gold: g.gold + n * price, oreItems: { ...g.oreItems, [oreId]: g.oreItems[oreId] - n } };
-    });
-    market.record("sells", oreId, n);
-    showToast(`${ORES.find((o) => o.id === oreId).name} ${fmt(n)}개 판매 +${fmt(n * price)}`, "#ff6b6b");
-  };
-
-  const marketBuy = (oreId, qty) => {
-    const cost = qty * market.priceOf(oreId) * BUY_SPREAD;
-    if (gameRef.current.gold < cost) return;
-    setGame((g) => (g.gold < cost ? g : { ...g, gold: g.gold - cost, oreItems: { ...g.oreItems, [oreId]: (g.oreItems[oreId] || 0) + qty } }));
-    market.record("buys", oreId, qty);
-    showToast(`${ORES.find((o) => o.id === oreId).name} ${qty}개 구매 -${fmt(cost)}`, "#4fa3ff");
+    const price = market.priceOf(id);
+    setGame((g) => ((g.byproducts[id] || 0) < n ? g : { ...g, gold: g.gold + n * price, byproducts: { ...g.byproducts, [id]: g.byproducts[id] - n } }));
+    market.recordSell(id, n);
+    showToast(`${BYPRODUCTS.find((b) => b.id === id).name} ${fmt(n)}개 판매 +${fmt(n * price)}`, "#ff6b6b");
   };
 
   // TODO: 스토어 출시 시 AdMob 보상형 광고로 교체 (광고 완료 콜백에서 onDone 실행)
@@ -568,17 +710,19 @@ function Game({ user, onExit }) {
   };
 
   const rebirth = () => {
-    const gain = stonesFor(gameRef.current.runEarned);
-    if (gain < 1) return;
+    const g0 = gameRef.current;
+    if (g0.gold < prestigeCostOf(g0.prestiges)) return;
     if (!armPrestige) {
       setArmPrestige(true);
       setTimeout(() => setArmPrestige(false), 3000);
       return;
     }
     setArmPrestige(false);
-    setGame((g) => rebirthOf(g));
+    setGame((g) => (g.gold < prestigeCostOf(g.prestiges) ? g : rebirthOf(g)));
     setRush({ gauge: 0, until: 0, duration: RUSH.duration });
-    showBanner("환생 완료!", `💎 +${gain} · 골드 x${prestigeMult(gameRef.current.stones + gain).toFixed(1)}`, "#ff9ef5");
+    bossRef.current = null;
+    setBoss(null);
+    showBanner("환생 완료!", `💎 +${stonesFor(g0.prestiges)} · 골드 x${prestigeMult(g0.prestiges + 1).toFixed(2)}`, "#ff9ef5");
   };
 
   const resetGame = () => {
@@ -617,10 +761,16 @@ function Game({ user, onExit }) {
     .flatMap((w) => Array.from({ length: Math.min(game.workers[w.id], MAX_WALKERS) }, () => w))
     .slice(0, MAX_WALKERS);
   const dots = {
-    workers: adsLeft > 0 || RARITIES.slice(0, -1).some((_, r) => (pickMergeMaterials(game.workers, r) || []).length === MERGE.count),
+    workers: adsLeft > 0,
+    charms: game.stones >= CHARM_GACHA.cost,
     missions: attendanceDue || QUESTS.some((q, i) => (daily[q.id] || 0) >= q.goal && !daily.claimed[i]),
-    prestige: stonesFor(game.runEarned) > 0,
+    prestige: game.gold >= prestigeCostOf(game.prestiges),
   };
+  const bossReady = canChallengeBoss(game);
+  const topOre = ORES[game.oreLevel];
+  const nextOre = ORES[game.oreLevel + 1];
+  const fighting = Boolean(boss);
+  const shownOre = fighting ? ORES[boss.level] : ore;
 
   if (!loaded) return <div className="splash">광산 여는 중...</div>;
 
@@ -660,9 +810,9 @@ function Game({ user, onExit }) {
                 </button>
               </>
             )}
-            {game.stones > 0 && (
+            {(game.prestiges > 0 || game.stones > 0) && (
               <span className="stone-chip">
-                💎 {game.stones} · x{prestigeMult(game.stones).toFixed(1)}
+                💎 {game.stones} · 환생 {game.prestiges}회
               </span>
             )}
           </div>
@@ -672,7 +822,7 @@ function Game({ user, onExit }) {
           {fmt(game.gold)}
         </div>
         <div className="rate">
-          초당 +{fmt(income, 1)} · 탭 {fmt(stats.tapDamage)} · 치명 {Math.round(stats.critChance * 100)}%
+          탭 {fmt(stats.tapDamage)} · 치명 {Math.round(stats.critChance * 100)}% · 광부 초당 +{fmt(income, 1)}
         </div>
         <div className={`rush-gauge ${rushing ? "on" : ""}`}>
           <div className="rush-fill" style={{ width: `${(rushing ? rushLeft / rush.duration : rush.gauge) * 100}%` }} />
@@ -680,30 +830,39 @@ function Game({ user, onExit }) {
         </div>
       </header>
 
-      <div className="ore-picker" role="tablist" aria-label="캘 광석">
-        {ORES.map((o, i) => {
+      <div className="ore-picker" aria-label="캘 광석">
+        {ORES.slice(0, game.oreLevel + 2).map((o, i) => {
           const unlocked = isOreUnlocked(game, i);
-          const prevBreaks = i ? game.oreBreaks[ORES[i - 1].id] || 0 : 0;
           return (
             <button
               key={o.id}
               className={`ore-chip ${game.ore === o.id ? "active" : ""} ${unlocked ? "" : "locked"}`}
               style={{ "--oc": o.vein[1] }}
-              disabled={!unlocked}
+              disabled={!unlocked || fighting}
               onClick={() => selectOre(o.id)}
             >
               <OreItemIcon ore={o} size={20} />
-              <span>{unlocked ? o.name : `🔒 ${prevBreaks}/${BREAKS_TO_UNLOCK}`}</span>
+              <span>{unlocked ? o.name : `👑 ${o.name}`}</span>
             </button>
           );
         })}
       </div>
 
+      {nextOre && !fighting && (
+        <button className={`boss-bar ${bossReady ? "ready" : ""}`} disabled={!bossReady} onClick={startBoss}>
+          {bossReady
+            ? `👑 ${topOre.name} 광석 보스 도전 · ${BOSS.seconds}초 안에 HP ${fmt(bossHpOf(game.oreLevel))} → ${nextOre.name} 해금`
+            : oreIndex === game.oreLevel
+              ? `${topOre.name} 광석을 ${BOSS.breaksNeeded}번 부수면 보스 도전 (${Math.min(game.oreBreaks[topOre.id] || 0, BOSS.breaksNeeded)}/${BOSS.breaksNeeded})`
+              : `보스는 가장 높은 광석(${topOre.name})에서 도전할 수 있어요`}
+        </button>
+      )}
+
       <div
-        className={`scene ${rushing ? "rush" : ""}`}
+        className={`scene ${rushing ? "rush" : ""} ${fighting ? "boss" : ""}`}
         ref={sceneRef}
         onPointerDown={tap}
-        style={{ "--bg1": ore.bg[0], "--bg2": ore.bg[1], "--bg3": ore.bg[2], "--glow": ore.vein[1] }}
+        style={{ "--bg1": shownOre.bg[0], "--bg2": shownOre.bg[1], "--bg3": shownOre.bg[2], "--glow": shownOre.vein[1] }}
       >
         {DUST.map((d, i) => (
           <span key={i} className="dust" style={{ left: d.left, top: d.top, animationDelay: d.delay }} />
@@ -714,25 +873,35 @@ function Game({ user, onExit }) {
               <CoinIcon size={16} />
             </span>
           ))}
-        <div className="ore-hp">
-          <span>
-            {ore.name} 광석 · 파괴 {fmt(game.oreBreaks[ore.id] || 0)}회
-          </span>
-          <div className="hp-bar">
-            <div style={{ width: `${(1 - game.oreDamage / ore.hp) * 100}%` }} />
+        {fighting ? (
+          <div className="ore-hp boss-hp">
+            <span>👑 {shownOre.name} 광석 보스</span>
+            <div className="hp-bar">
+              <div style={{ width: `${(boss.hp / boss.max) * 100}%` }} />
+            </div>
+            <span className="hp-text">⏱ {Math.max(0, Math.ceil((boss.until - now) / 1000))}초</span>
           </div>
-          <span className="hp-text">
-            {fmt(Math.max(0, ore.hp - game.oreDamage))} / {fmt(ore.hp)}
-          </span>
-        </div>
+        ) : (
+          <div className="ore-hp">
+            <span>
+              {ore.name} 광석 · 파괴 {fmt(game.oreBreaks[ore.id] || 0)}회
+            </span>
+            <div className="hp-bar">
+              <div style={{ width: `${(1 - game.oreDamage / ore.hp) * 100}%` }} />
+            </div>
+            <span className="hp-text">
+              {fmt(Math.max(0, ore.hp - game.oreDamage))} / {fmt(ore.hp)}
+            </span>
+          </div>
+        )}
         <div key={hit} className={`rock-wrap ${hit ? "hit" : ""}`}>
-          <OreRock ore={ore} damage={game.oreDamage / ore.hp} />
+          <OreRock ore={shownOre} damage={fighting ? 1 - boss.hp / boss.max : game.oreDamage / ore.hp} boss={fighting} />
         </div>
         <div className="ground" />
         {walkers.map((w, i) => (
           <Walker key={i} index={i} look={w.look} rarity={w.rarity} />
         ))}
-        {bat && (
+        {bat && !fighting && (
           <button
             key={bat.id}
             className={`bat ${bat.fromLeft ? "" : "reverse"}`}
@@ -766,7 +935,7 @@ function Game({ user, onExit }) {
           if (item.type === "drop") {
             return (
               <span key={item.id} className="fx-drop" style={{ left: item.x, top: item.y }}>
-                <OreItemIcon ore={item.ore} size={26} />
+                <ByproductIcon item={item.item} size={24} />
                 {item.text}
               </span>
             );
@@ -797,17 +966,23 @@ function Game({ user, onExit }) {
           watchingAd={watchingAd}
           onAdPull={() => playAd("ticket", () => pull(TICKETS.find((t) => t.id === AD_TICKET.ticket), 1, "ad"))}
           onPull={pull}
-          onMerge={merge}
+          onMerge={mergeWorkers}
         />
       )}
       {tab === "charms" && (
-        <CharmsPanel game={game} stats={stats} onEquip={equipCharm} onUnequip={unequipCharm} onSell={sellCharm} onSellBelow={sellCharmsBelow} />
+        <CharmsPanel
+          game={game}
+          stats={stats}
+          onEquip={equipCharm}
+          onUnequip={unequipCharm}
+          onSell={sellCharm}
+          onPull={pullCharms}
+          onMerge={mergeCharms}
+        />
       )}
-      {tab === "market" && <MarketPanel game={game} market={market} onSell={marketSell} onBuy={marketBuy} />}
+      {tab === "market" && <MarketPanel game={game} market={market} onSell={sellByproduct} />}
       {tab === "missions" && <MissionsPanel game={game} attendanceDue={attendanceDue} onClaimQuest={claimQuest} />}
-      {tab === "prestige" && (
-        <PrestigePanel game={game} armed={armPrestige} armedReset={armReset} onRebirth={rebirth} onReset={resetGame} />
-      )}
+      {tab === "prestige" && <PrestigePanel game={game} armed={armPrestige} armedReset={armReset} onRebirth={rebirth} onReset={resetGame} />}
 
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
@@ -825,9 +1000,7 @@ function Game({ user, onExit }) {
         </div>
       )}
 
-      {askNickname && (
-        <NicknameModal initial={game.nickname} canClose={Boolean(game.nickname)} onSave={saveNickname} onClose={() => setAskNickname(false)} />
-      )}
+      {askNickname && <NicknameModal initial={game.nickname} canClose={Boolean(game.nickname)} onSave={saveNickname} onClose={() => setAskNickname(false)} />}
 
       {!askNickname && offline >= 1 && (
         <div className="overlay">
@@ -836,7 +1009,7 @@ function Game({ user, onExit }) {
             <div className="chest">
               <ChestIcon />
             </div>
-            <h2>자리를 비운 동안 캐 온 골드</h2>
+            <h2>자리를 비운 동안 광부들이 캐 온 골드</h2>
             <p className="reward">
               <CoinIcon size={30} />
               {fmt(offline)}
@@ -882,11 +1055,9 @@ function Game({ user, onExit }) {
 
       {pullResult && (
         <div
-          className={`overlay pull-overlay r${pullResult.best}`}
+          className={`overlay solid pull-overlay r${pullResult.best}`}
           style={{ "--bc": RARITIES[pullResult.best].color }}
-          onClick={() =>
-            setPullResult((p) => (p.stage === "summon" ? { ...p, stage: "reveal" } : null))
-          }
+          onClick={() => (pullResult.stage === "summon" ? revealPull() : setPullResult(null))}
         >
           {pullResult.stage === "summon" ? (
             <div className="summon">
@@ -896,21 +1067,16 @@ function Game({ user, onExit }) {
                 ))}
               </div>
               <div className="summon-orb" />
-              <p className="summon-text">{pullResult.best >= 4 ? "강한 기운이 느껴져요…!" : "광부를 부르는 중…"}</p>
+              <p className="summon-text">{pullResult.best >= 4 ? "강한 기운이 느껴져요…!" : pullResult.kind === "charm" ? "장신구를 꺼내는 중…" : "광부를 부르는 중…"}</p>
               <p className="summon-skip">탭해서 건너뛰기</p>
             </div>
           ) : (
             <div key={pullResult.id} className={`modal pull-modal ${pullResult.best >= 4 ? "jackpot" : ""}`}>
               {pullResult.best >= 4 && <div className="banner-rays" />}
-              <h2>{pullResult.best >= 4 ? `${RARITIES[pullResult.best].name} 광부 등장!` : pullResult.title}</h2>
+              <h2>{pullResult.best >= 4 ? `${RARITIES[pullResult.best].name} 등장!` : pullResult.title}</h2>
               <div className={`pull-grid ${pullResult.results.length > 1 ? "multi" : ""}`}>
-                {pullResult.results.map((w, i) => (
-                  <div key={i} className={`pull-card r${w.rarity}`} style={{ "--rc": RARITIES[w.rarity].color, animationDelay: `${i * 0.12}s` }}>
-                    {w.isNew && <span className="new-tag">NEW</span>}
-                    <WorkerIcon look={w.look} rarity={w.rarity} size={pullResult.results.length > 1 ? 40 : 72} still />
-                    <span className="pull-name">{w.name}</span>
-                    <span className="pull-rarity">{RARITIES[w.rarity].name}</span>
-                  </div>
+                {pullResult.results.map((item, i) => (
+                  <ResultCard key={i} kind={pullResult.kind} item={item} big={pullResult.results.length === 1} delay={i * 0.12} isNew={item.isNew} />
                 ))}
               </div>
               <button className="ad-btn">
@@ -922,44 +1088,67 @@ function Game({ user, onExit }) {
       )}
 
       {mergeResult && (
-        <div className="overlay" onClick={() => mergeResult.stage === "result" && setMergeResult(null)}>
+        <div className="overlay solid" onClick={() => mergeResult.stage === "result" && setMergeResult(null)}>
           {mergeResult.stage === "merging" ? (
             <div className="merging">
-              {mergeResult.materials.map((w, i) => (
+              {mergeResult.results[0].mats.map((m, i) => (
                 <span key={i} className={`merge-mat m${i}`}>
-                  <WorkerIcon look={w.look} rarity={w.rarity} size={56} still />
+                  {mergeResult.kind === "worker" ? <WorkerIcon look={m.look} rarity={m.rarity} size={56} still /> : <CharmIcon type={m.type} rarity={m.rarity} size={52} />}
                 </span>
               ))}
-              <div className="merge-core" style={{ "--rc": RARITIES[mergeResult.materials[0].rarity + 1].color }} />
-              <p className="summon-text">합성 중…</p>
+              <div className="merge-core" />
+              <p className="summon-text">{mergeResult.results.length > 1 ? `${mergeResult.results.length}번 합성 중…` : "합성 중…"}</p>
             </div>
           ) : (
-            <div
-              className={`modal merge-modal ${mergeResult.outcome}`}
-              style={{ "--bc": mergeResult.result ? RARITIES[mergeResult.result.rarity].color : "#78909c" }}
-            >
-              {mergeResult.outcome !== "fail" && <div className="banner-rays" />}
-              <h2>{{ great: "대성공!! 두 등급 상승", success: "합성 성공!", fail: "합성 실패…" }[mergeResult.outcome]}</h2>
-              <div className="pull-grid">
-                {(() => {
-                  const w = mergeResult.result || mergeResult.refund;
-                  return (
-                    <div className={`pull-card r${w.rarity} ${mergeResult.outcome === "fail" ? "failed" : ""}`} style={{ "--rc": RARITIES[w.rarity].color }}>
-                      {mergeResult.isNew && <span className="new-tag">NEW</span>}
-                      <WorkerIcon look={w.look} rarity={w.rarity} size={72} still />
-                      <span className="pull-name">{w.name}</span>
-                      <span className="pull-rarity">{mergeResult.outcome === "fail" ? "1명 돌려받음" : RARITIES[w.rarity].name}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-              <button className="ad-btn">
-                <span className="ad-label">확인</span>
-              </button>
-            </div>
+            <MergeSummary result={mergeResult} />
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ResultCard({ kind, item, big, delay = 0, isNew, failed }) {
+  return (
+    <div className={`pull-card r${item.rarity} ${failed ? "failed" : ""}`} style={{ "--rc": RARITIES[item.rarity].color, animationDelay: `${delay}s` }}>
+      {isNew && <span className="new-tag">NEW</span>}
+      {kind === "worker" ? (
+        <WorkerIcon look={item.look} rarity={item.rarity} size={big ? 84 : 44} still />
+      ) : (
+        <CharmIcon type={item.type} rarity={item.rarity} size={big ? 64 : 38} />
+      )}
+      <span className="pull-name">{kind === "worker" ? item.name : charmTypeOf(item).name}</span>
+      <span className="pull-rarity">{failed ? "돌려받음" : RARITIES[item.rarity].name}</span>
+    </div>
+  );
+}
+
+function MergeSummary({ result }) {
+  const { kind, results } = result;
+  const count = (o) => results.filter((r) => r.outcome === o).length;
+  const best = results.reduce((b, r) => (r.outcome !== "fail" && (!b || r.item.rarity > b.item.rarity) ? r : b), null);
+  const single = results.length === 1 ? results[0] : null;
+  const outcome = single ? single.outcome : best ? (count("great") ? "great" : "success") : "fail";
+  const title = single
+    ? { great: "대성공!! 두 등급 상승", success: "합성 성공!", fail: "합성 실패…" }[single.outcome]
+    : `${results.length}번 합성 완료`;
+  return (
+    <div className={`modal merge-modal ${outcome}`} style={{ "--bc": best ? RARITIES[best.item.rarity].color : "#78909c" }}>
+      {outcome !== "fail" && <div className="banner-rays" />}
+      <h2>{title}</h2>
+      {!single && (
+        <p className="merge-count">
+          대성공 {count("great")} · 성공 {count("success")} · 실패 {count("fail")}
+        </p>
+      )}
+      <div className={`pull-grid ${single ? "" : "multi"}`}>
+        {results.map((r, i) => (
+          <ResultCard key={i} kind={kind} item={r.item} big={Boolean(single)} delay={i * 0.08} isNew={r.isNew} failed={r.outcome === "fail"} />
+        ))}
+      </div>
+      <button className="ad-btn">
+        <span className="ad-label">확인</span>
+      </button>
     </div>
   );
 }

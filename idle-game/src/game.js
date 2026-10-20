@@ -1,8 +1,9 @@
 import {
+  BOSS,
   BREAK_BONUS,
-  BREAKS_TO_UNLOCK,
+  BYPRODUCTS,
   CHARM_CAP,
-  CHARM_RARITY_WEIGHTS,
+  CHARM_GACHA,
   CHARM_SLOTS,
   CHARM_TYPES,
   COMBOS,
@@ -10,57 +11,75 @@ import {
   EQUIP_GROWTH,
   MATERIALS,
   MAX_LEVEL,
-  MERGE,
   ORES,
-  PRESTIGE_UNIT,
+  PRESTIGE,
   QUESTS,
   RARITIES,
   RUSH,
   SET_BONUS,
-  TICKETS,
-  TICKET_GROWTH,
   TRIBES,
   TRIBE_STEPS,
+  WORKER_GOLD,
   WORKERS,
 } from "./data";
 
+const UNITS = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
 export const fmt = (n, decimals = 0) => {
-  const units = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp"];
+  if (!Number.isFinite(n)) return "∞";
   let i = 0;
-  while (n >= 1000 && i < units.length - 1) {
+  while (n >= 1000 && i < UNITS.length - 1) {
     n /= 1000;
     i++;
   }
-  if (i > 0) return n.toFixed(2) + units[i];
+  if (n >= 1000) return n.toExponential(2).replace("+", "") + UNITS[i];
+  if (i > 0) return n.toFixed(2) + UNITS[i];
   return decimals ? String(parseFloat(n.toFixed(decimals))) : Math.floor(n).toString();
 };
 
-export const pct = (v) => `${parseFloat((v * 100).toFixed(1))}%`;
+export const pct = (v) => `${parseFloat((v * 100).toFixed(2))}%`;
 
 // ---------- 장비 ----------
-export const materialOf = (level) => MATERIALS[Math.min(Math.max(level - 1, 0), MAX_LEVEL - 1) / 10 | 0];
-export const equipCostOf = (slot, level) => Math.floor(slot.base * EQUIP_GROWTH ** level);
-export const pickaxeDamageOf = (level) => (1 + level) * 2 ** Math.floor(level / 10);
+export const materialIndexOf = (level) => Math.min(MATERIALS.length - 1, Math.floor(Math.max(level - 1, 0) / 100));
+export const materialOf = (level) => MATERIALS[materialIndexOf(level)];
+// 같은 재질 안에서 10레벨마다 +1 강화 표시
+export const plusOf = (level) => (level ? Math.floor(((level - 1) % 100) / 10) : 0);
+export const equipNameOf = (slot, level) =>
+  level ? `${materialOf(level).name} ${slot.name}${plusOf(level) ? ` +${plusOf(level)}` : ""}` : `기본 ${slot.name}`;
+export const equipCostOf = (slot, level) => Math.floor(slot.base * EQUIP_GROWTH ** level * (level + 1));
+export const pickaxeDamageOf = (level) => (1 + level) * 1.35 ** Math.floor(level / 10);
 export const setTierOf = (equip) => Math.floor(Math.min(...EQUIPMENT.map((e) => equip[e.id])) / 10);
+
+// 지금 골드로 연속해서 올릴 수 있는 레벨 수와 총 비용
+export const maxBuyOf = (slot, level, gold) => {
+  let count = 0;
+  let cost = 0;
+  while (level + count < MAX_LEVEL) {
+    const next = equipCostOf(slot, level + count);
+    if (cost + next > gold) break;
+    cost += next;
+    count++;
+  }
+  return { count, cost };
+};
 
 export const equipEffectText = (slotId, level) => {
   switch (slotId) {
     case "pickaxe":
       return `탭 피해 ${fmt(pickaxeDamageOf(level))}`;
     case "helmet":
-      return `치명타 확률 ${pct(level * 0.004)}`;
+      return `치명타 확률 ${pct(level * 0.0004)}`;
     case "gloves":
-      return `치명타 피해 x${(2 + level * 0.08).toFixed(2)}`;
+      return `치명타 피해 x${(2 + level * 0.02).toFixed(2)}`;
     case "shirt":
-      return `일꾼 효율 +${level * 3}%`;
+      return `광부 효율 +${level}%`;
     case "pants":
-      return `골드 러시 +${(level * 0.1).toFixed(1)}초 · 탭 x${(RUSH.tapMult + level * 0.03).toFixed(2)}`;
+      return `골드 러시 +${(level * 0.01).toFixed(2)}초 · 탭 x${(RUSH.tapMult + level * 0.005).toFixed(2)}`;
     default:
-      return `파괴 보너스 +${level * 5}% · 드롭률 +${level}%`;
+      return `파괴 보너스 +${level * 2}% · 드롭 +${(level * 0.1).toFixed(1)}%`;
   }
 };
 
-// ---------- 일꾼 ----------
+// ---------- 광부 ----------
 export const workerById = (id) => WORKERS.find((w) => w.id === id);
 export const workerRateOf = (workers) => WORKERS.reduce((sum, w) => sum + w.rate * (workers?.[w.id] || 0), 0);
 
@@ -72,8 +91,7 @@ export const tribeStatusOf = (workers) =>
     return { id, ...tribe, members, owned, bonus: step?.bonus || 0 };
   });
 
-export const comboStatusOf = (workers) =>
-  COMBOS.map((c) => ({ ...c, active: c.members.every((m) => workers[m]) }));
+export const comboStatusOf = (workers) => COMBOS.map((c) => ({ ...c, active: c.members.every((m) => workers[m]) }));
 
 // ---------- 장신구 ----------
 export const charmTypeOf = (charm) => CHARM_TYPES.find((t) => t.id === charm.type);
@@ -82,29 +100,37 @@ export const charmText = (charm) => {
   if (stat === "critChance") return `치명타 확률 +${pct(charm.value)}`;
   if (stat === "critDmg") return `치명타 피해 +${charm.value.toFixed(2)}`;
   if (stat === "rush") return `골드 러시 +${charm.value.toFixed(1)}초`;
-  return `${{ drop: "드롭률", gold: "골드 획득", worker: "일꾼 효율" }[stat]} +${pct(charm.value)}`;
+  return `${{ drop: "부산물 드롭", gold: "골드 획득", worker: "광부 효율" }[stat]} +${pct(charm.value)}`;
 };
-export const charmChanceOf = (oreIndex) => 0.03 + oreIndex * 0.005;
+export const charmSellOf = (rarity) => 1000 * 4 ** rarity;
 
-export const rollCharm = (oreIndex, roll) => {
-  const weights = CHARM_RARITY_WEIGHTS.map((w, r) => w * (1 + oreIndex * 0.4) ** r);
-  let pick = roll() * weights.reduce((a, b) => a + b, 0);
-  let rarity = 0;
-  while (rarity < weights.length - 1 && pick >= weights[rarity]) pick -= weights[rarity++];
-  const type = CHARM_TYPES[Math.floor(roll() * CHARM_TYPES.length)];
-  const ore = ORES[oreIndex];
+export const makeCharm = (typeId, rarity, roll) => {
+  const type = CHARM_TYPES.find((t) => t.id === typeId);
   return {
     uid: Math.floor(roll() * 2 ** 40).toString(36) + Date.now().toString(36),
     type: type.id,
     rarity,
     value: type.base * (1 + rarity * 0.8) * (0.8 + roll() * 0.4),
-    sell: Math.round(ore.hp * ore.mult * (rarity + 1) * 2),
   };
 };
 
+export const rollCharm = (roll) => {
+  let pick = roll() * 100;
+  let rarity = 0;
+  while (rarity < CHARM_GACHA.odds.length - 1 && pick >= CHARM_GACHA.odds[rarity]) pick -= CHARM_GACHA.odds[rarity++];
+  return makeCharm(CHARM_TYPES[Math.floor(roll() * CHARM_TYPES.length)].id, rarity, roll);
+};
+
+// 장착하지 않은 같은 등급 장신구 중 수치가 낮은 것부터 재료로
+export const pickCharmMaterials = (g, rarity, count) => {
+  const pool = g.charms.filter((c) => c.rarity === rarity && !g.equipped.includes(c.uid)).sort((a, b) => a.value - b.value);
+  return pool.length >= count ? pool.slice(0, count) : null;
+};
+
 // ---------- 능력치 합산 ----------
-export const prestigeMult = (stones) => 1 + stones * 0.1;
-export const stonesFor = (runEarned) => Math.floor(Math.sqrt(runEarned / PRESTIGE_UNIT));
+export const prestigeMult = (prestiges) => 1 + prestiges * PRESTIGE.bonus;
+export const prestigeCostOf = (prestiges) => PRESTIGE.base * PRESTIGE.growth ** prestiges;
+export const stonesFor = (prestiges) => PRESTIGE.stonesBase + prestiges;
 
 export const statsOf = (g) => {
   const bonus = { gold: 0, tap: 0, worker: 0, drop: 0, crit: 0 };
@@ -119,24 +145,29 @@ export const statsOf = (g) => {
   const setTier = setTierOf(e);
   return {
     setTier,
-    goldMult: prestigeMult(g.stones) * (1 + bonus.gold + charm.gold) * (1 + SET_BONUS.gold * setTier),
+    goldMult: prestigeMult(g.prestiges) * (1 + bonus.gold + charm.gold) * (1 + SET_BONUS.gold * setTier),
     tapDamage: pickaxeDamageOf(e.pickaxe) * (1 + bonus.tap),
-    critChance: Math.min(0.75, e.helmet * 0.004 + charm.critChance + SET_BONUS.critChance * setTier),
-    critMult: (2 + e.gloves * 0.08) * (1 + bonus.crit) + charm.critDmg,
-    workerPower: workerRateOf(g.workers) * (1 + e.shirt * 0.03) * (1 + bonus.worker + charm.worker),
-    rushDuration: RUSH.duration + e.pants * 0.1 + charm.rush,
-    rushTapMult: RUSH.tapMult + e.pants * 0.03,
-    breakMult: 1 + e.boots * 0.05,
-    dropMult: 1 + e.boots * 0.01 + bonus.drop + charm.drop,
+    critChance: Math.min(0.75, e.helmet * 0.0004 + charm.critChance + SET_BONUS.critChance * setTier),
+    critMult: (2 + e.gloves * 0.02) * (1 + bonus.crit) + charm.critDmg,
+    workerPower: workerRateOf(g.workers) * (1 + e.shirt * 0.01) * (1 + bonus.worker + charm.worker),
+    rushDuration: RUSH.duration + e.pants * 0.01 + charm.rush,
+    rushTapMult: RUSH.tapMult + e.pants * 0.005,
+    breakMult: 1 + e.boots * 0.02,
+    dropMult: 1 + e.boots * 0.001 + bonus.drop + charm.drop,
     bonus,
     charm,
   };
 };
 
-// ---------- 광석 ----------
+// ---------- 광석 · 보스 ----------
 export const oreIndexOf = (id) => Math.max(0, ORES.findIndex((o) => o.id === id));
-export const isOreUnlocked = (g, index) => index === 0 || (g.oreBreaks[ORES[index - 1].id] || 0) >= BREAKS_TO_UNLOCK;
-export const incomeOf = (g, st = statsOf(g)) => st.workerPower * ORES[oreIndexOf(g.ore)].mult * st.goldMult;
+export const isOreUnlocked = (g, index) => index <= g.oreLevel;
+export const canChallengeBoss = (g) =>
+  g.oreLevel < ORES.length - 1 &&
+  oreIndexOf(g.ore) === g.oreLevel &&
+  (g.oreBreaks[ORES[g.oreLevel].id] || 0) >= BOSS.breaksNeeded;
+export const bossHpOf = (oreLevel) => ORES[oreLevel].hp * BOSS.hpMult;
+export const incomeOf = (g, st = statsOf(g)) => st.workerPower * ORES[oreIndexOf(g.ore)].mult * st.goldMult * WORKER_GOLD;
 
 export const addGold = (g, amount) => ({
   ...g,
@@ -145,11 +176,11 @@ export const addGold = (g, amount) => ({
   runEarned: g.runEarned + amount,
 });
 
-// 피해를 주고 골드·파괴 보상·드롭을 계산. rolls는 미리 뽑아 둔 난수 (state 업데이트를 순수하게 유지)
-export const applyDamage = (g, damage, st, rolls) => {
+// 피해를 주고 골드·파괴 보상·부산물을 계산. rolls는 미리 뽑아 둔 난수 (state 업데이트를 순수하게 유지)
+export const applyDamage = (g, damage, st, rolls, goldFactor) => {
   const index = oreIndexOf(g.ore);
   const ore = ORES[index];
-  let next = addGold(g, damage * ore.mult * st.goldMult);
+  let next = addGold(g, damage * ore.mult * st.goldMult * goldFactor);
   const total = g.oreDamage + damage;
   const breaks = Math.floor(total / ore.hp);
   next.oreDamage = total - breaks * ore.hp;
@@ -160,35 +191,27 @@ export const applyDamage = (g, damage, st, rolls) => {
   const bonus = breaks * ore.hp * ore.mult * BREAK_BONUS * st.breakMult * st.goldMult;
   next = addGold(next, bonus);
 
+  const scale = 2 ** index * st.dropMult;
+  const items = {};
   const rolled = Math.min(breaks, 20);
-  let items = 0;
-  const found = [];
   for (let i = 0; i < rolled; i++) {
-    items += 1 + Math.floor(roll() * 3 * st.dropMult);
-    if (roll() < charmChanceOf(index) * st.dropMult) found.push(rollCharm(index, roll));
+    const id = ore.byproducts[Math.floor(roll() * ore.byproducts.length)];
+    items[id] = (items[id] || 0) + Math.max(1, Math.round((1 + Math.floor(roll() * 3)) * scale));
   }
-  if (breaks > rolled) items += Math.round((breaks - rolled) * 2 * st.dropMult);
-  const charms = found.slice(0, Math.max(0, CHARM_CAP - g.charms.length));
-
-  const before = g.oreBreaks[ore.id] || 0;
-  const after = before + breaks;
-  const unlocked = before < BREAKS_TO_UNLOCK && after >= BREAKS_TO_UNLOCK && ORES[index + 1] ? ORES[index + 1].id : null;
-
-  next.oreItems = { ...next.oreItems, [ore.id]: (next.oreItems[ore.id] || 0) + items };
-  next.charms = [...next.charms, ...charms];
-  next.oreBreaks = { ...next.oreBreaks, [ore.id]: after };
+  if (breaks > rolled) {
+    const extra = Math.round(((breaks - rolled) * 2 * scale) / ore.byproducts.length);
+    ore.byproducts.forEach((id) => (items[id] = (items[id] || 0) + extra));
+  }
+  const byproducts = { ...next.byproducts };
+  Object.entries(items).forEach(([id, n]) => (byproducts[id] = (byproducts[id] || 0) + n));
+  next.byproducts = byproducts;
+  next.oreBreaks = { ...next.oreBreaks, [ore.id]: (next.oreBreaks[ore.id] || 0) + breaks };
   next = bumpDaily(next, "breaks", breaks);
-  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, ore: ore.id, breaks, bonus, items, charms, unlocked };
+  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, ore: ore.id, breaks, bonus, items };
   return next;
 };
 
 // ---------- 뽑기 · 합성 ----------
-export const ticketCostOf = (ticket, pulls, times = 1) => {
-  let total = 0;
-  for (let k = 0; k < times; k++) total += Math.floor(ticket.cost * TICKET_GROWTH ** (pulls + k));
-  return total;
-};
-
 export const pickWorker = (rarity, rand = Math.random) => {
   const pool = WORKERS.filter((w) => w.rarity === rarity);
   return pool[Math.floor(rand() * pool.length)];
@@ -210,11 +233,11 @@ export const rollWorker = (ticket, rand = Math.random) => {
 export const rarityCountOf = (workers, rarity) =>
   WORKERS.filter((w) => w.rarity === rarity).reduce((sum, w) => sum + (workers[w.id] || 0), 0);
 
-// 같은 등급 일꾼 3명을 재료로 고름 (많이 가진 일꾼부터)
-export const pickMergeMaterials = (workers, rarity) => {
+// 같은 등급 광부 count명을 재료로 고름 (많이 가진 광부부터)
+export const pickMergeMaterials = (workers, rarity, count) => {
   const left = { ...workers };
   const used = [];
-  for (let i = 0; i < MERGE.count; i++) {
+  for (let i = 0; i < count; i++) {
     const best = WORKERS.filter((w) => w.rarity === rarity && left[w.id] > 0).sort((a, b) => left[b.id] - left[a.id])[0];
     if (!best) return null;
     used.push(best);
@@ -223,12 +246,12 @@ export const pickMergeMaterials = (workers, rarity) => {
   return used;
 };
 
-export const rollMerge = (rarity, rand = Math.random) => {
-  const success = MERGE.success(rarity);
+// 합성 결과: great(+2등급) / success(+1등급) / fail
+export const rollMergeOutcome = (config, rarity, rand = Math.random) => {
   const r = rand();
-  if (r < MERGE.great && rarity + 2 < RARITIES.length) return { outcome: "great", result: pickWorker(rarity + 2, rand) };
-  if (r < MERGE.great + success) return { outcome: "success", result: pickWorker(rarity + 1, rand) };
-  return { outcome: "fail", result: null };
+  if (r < config.great && rarity + 2 < RARITIES.length) return "great";
+  if (r < config.great + config.success(rarity)) return "success";
+  return "fail";
 };
 
 // ---------- 하루 단위 기록 ----------
@@ -240,8 +263,8 @@ export const bumpDaily = (g, field, amount = 1) => {
   const daily = dailyOf(g.daily);
   return { ...g, daily: { ...daily, [field]: (daily[field] || 0) + amount } };
 };
-export const questRewardOf = (g) => Math.max(1000, incomeOf(g) * 900);
-export const attendanceRewardOf = (g, day) => Math.max(500 * day, incomeOf(g) * 600 * day);
+export const questRewardOf = (g) => Math.max(1000, incomeOf(g) * 600);
+export const attendanceRewardOf = (g, day) => Math.max(500 * day, incomeOf(g) * 400 * day);
 export const nextStreakOf = (attendance) => (attendance.last === yesterdayKey() ? (attendance.streak % 7) + 1 : 1);
 
 // ---------- 저장 데이터 정리 ----------
@@ -261,27 +284,29 @@ export const normalize = (saved) => {
     ? s.charms
         .filter((c) => c && typeof c.uid === "string" && CHARM_TYPES.some((t) => t.id === c.type))
         .slice(0, CHARM_CAP)
-        .map((c) => ({ uid: c.uid, type: c.type, rarity: Math.floor(num(c.rarity)), value: num(c.value), sell: num(c.sell) }))
+        .map((c) => ({ uid: c.uid, type: c.type, rarity: Math.min(RARITIES.length - 1, Math.floor(num(c.rarity))), value: num(c.value) }))
     : [];
+  const oreBreaks = counts(s.oreBreaks, ORES);
+  // 이전 버전 저장(10번 부수면 해금)은 그때 열린 광석까지 인정
+  let legacyLevel = 0;
+  while (legacyLevel < ORES.length - 1 && (oreBreaks[ORES[legacyLevel].id] || 0) >= 10 && typeof s.oreLevel !== "number") legacyLevel++;
   const g = {
     nickname: typeof s.nickname === "string" ? s.nickname : "",
     gold: num(s.gold),
     totalEarned: Math.max(num(s.totalEarned), num(s.gold)),
-    runEarned: typeof s.runEarned === "number" ? num(s.runEarned) : num(s.totalEarned),
+    runEarned: num(s.runEarned),
     stones: Math.floor(num(s.stones)),
     prestiges: Math.floor(num(s.prestiges)),
     equip,
     workers: counts(s.workers, WORKERS),
-    pulls: counts(s.pulls, TICKETS),
     pity: Math.floor(num(s.pity)),
     ore: typeof s.ore === "string" ? s.ore : "stone",
+    oreLevel: Math.min(ORES.length - 1, Math.floor(typeof s.oreLevel === "number" ? num(s.oreLevel) : legacyLevel)),
     oreDamage: num(s.oreDamage),
-    oreBreaks: counts(s.oreBreaks, ORES),
-    oreItems: counts(s.oreItems, ORES),
+    oreBreaks,
+    byproducts: counts(s.byproducts, BYPRODUCTS),
     charms,
-    equipped: Array.isArray(s.equipped)
-      ? s.equipped.filter((uid) => charms.some((c) => c.uid === uid)).slice(0, CHARM_SLOTS)
-      : [],
+    equipped: Array.isArray(s.equipped) ? s.equipped.filter((uid) => charms.some((c) => c.uid === uid)).slice(0, CHARM_SLOTS) : [],
     daily:
       s.daily && typeof s.daily.day === "string"
         ? {
@@ -299,8 +324,8 @@ export const normalize = (saved) => {
     },
   };
   const index = ORES.findIndex((o) => o.id === g.ore);
-  if (index < 0 || !isOreUnlocked(g, index)) {
-    g.ore = "stone";
+  if (index < 0 || index > g.oreLevel) {
+    g.ore = ORES[g.oreLevel].id;
     g.oreDamage = 0;
   }
   return g;
@@ -312,14 +337,13 @@ export const toSave = (g) => {
   return { ...rest, savedAt: Date.now() };
 };
 
-// 환생: 골드·장비·티켓 가격만 초기화하고 일꾼·장신구·광석·시세 아이템은 유지
+// 환생: 골드와 장비만 초기화하고 광부·장신구·광석 해금·부산물은 유지
 export const rebirthOf = (g) => ({
   ...g,
   gold: 0,
   runEarned: 0,
-  stones: g.stones + stonesFor(g.runEarned),
+  stones: g.stones + stonesFor(g.prestiges),
   prestiges: g.prestiges + 1,
   equip: Object.fromEntries(EQUIPMENT.map((e) => [e.id, 0])),
-  pulls: {},
   oreDamage: 0,
 });
