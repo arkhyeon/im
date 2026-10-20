@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 랭킹을 위해 누구나 읽을 수 있고, 본인 문서만 쓸 수 있어요.
+    match /players/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1
+        && request.resource.data.nickname.size() <= 12
+        && request.resource.data.gold is number
+        && request.resource.data.totalEarned is number
+        && request.resource.data.clickLevel is int
+        && request.resource.data.owned is map;
+    }
+  }
+}
