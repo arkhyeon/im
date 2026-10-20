@@ -526,6 +526,7 @@ function Game({ user, onExit }) {
   };
 
   const tap = (e) => {
+    e.preventDefault();
     const rect = sceneRef.current.getBoundingClientRect();
     const st = statsOf(gameRef.current);
     const now = Date.now();

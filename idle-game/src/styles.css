@@ -2620,3 +2620,25 @@ input:focus-visible {
   text-align: center;
   line-height: 1.2;
 }
+
+/* 광석을 탭할 때 화면이 스크롤되거나 밀리지 않게 */
+.scene {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: contain;
+}
+
+.boss-bar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.rate,
+.ore-hp span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
