@@ -404,6 +404,21 @@ function Game({ user, onExit }) {
     return () => clearTimeout(timer);
   }, []);
 
+  // 광석 화면에서는 손가락을 끌어도 페이지(바깥 앱 포함)가 스크롤되지 않게 터치 기본 동작을 막아요
+  useEffect(() => {
+    const el = sceneRef.current;
+    if (!el) return undefined;
+    const block = (e) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchstart", block, { passive: false });
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", block);
+      el.removeEventListener("touchmove", block);
+    };
+  }, [loaded]);
+
   // 약점 표적: 광석 위 랜덤 위치, 맞히거나 시간이 지나면 이동
   const moveWeak = () => {
     const width = sceneRef.current?.clientWidth || 360;
