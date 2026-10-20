@@ -2722,3 +2722,14 @@ input:focus-visible {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-4px) rotate(2deg); }
 }
+
+/* 발까지 있는 걷기용 그림 */
+.walker-sprite.full-body {
+  height: 64px;
+  max-width: 60px;
+}
+
+.worker-art.thumb[src*="sprites"],
+.worker-art.thumb {
+  background: transparent;
+}

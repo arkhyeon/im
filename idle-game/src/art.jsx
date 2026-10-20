@@ -287,7 +287,7 @@ export const workerArtOf = (id) =>
 
 // full: 카드 그림 전체, 아니면 얼굴 중심으로 자른 정사각형 썸네일
 export function WorkerPortrait({ worker, size = 56, full = false }) {
-  const art = workerArtOf(worker.id);
+  const art = workerArtOf(worker.id) || workerSpriteOf(worker.id);
   if (!art) return <WorkerIcon look={worker.look} rarity={worker.rarity} size={size} still />;
   return (
     <img
@@ -302,11 +302,16 @@ export function WorkerPortrait({ worker, size = 56, full = false }) {
 
 // 배경을 지운 걷기용 그림 (src/assets/sprites/광부ID.webp). 없으면 SVG 꼬마 광부로 걸어요.
 const WORKER_SPRITES = import.meta.glob("./assets/sprites/*.{webp,png}", { eager: true, import: "default" });
-export const workerSpriteOf = (id) => WORKER_SPRITES[`./assets/sprites/${id}.webp`] || WORKER_SPRITES[`./assets/sprites/${id}.png`] || null;
+export function workerSpriteOf(id) {
+  return WORKER_SPRITES[`./assets/sprites/${id}.webp`] || WORKER_SPRITES[`./assets/sprites/${id}.png`] || null;
+}
+// 카드 그림에서 떼어낸 8명은 다리가 없어서 아랫부분을 땅 뒤로 숨겨요
+const HALF_BODY = new Set(["runesmith", "storm", "elder", "eternal", "dwarfgod", "genesis", "primal", "cosmic"]);
 
 // 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 광부
 export function Walker({ index, worker }) {
   const sprite = workerSpriteOf(worker.id);
+  const half = HALF_BODY.has(worker.id);
   const fromLeft = index % 2 === 0;
   const lane = Math.floor(index / 2);
   const timing = {
@@ -321,8 +326,8 @@ export function Walker({ index, worker }) {
         "--from": fromLeft ? `${-10 + lane * 3}%` : `${90 - lane * 3}%`,
         "--to": fromLeft ? `${4 + lane * 8}%` : `${74 - lane * 8}%`,
         "--dir": fromLeft ? 1 : -1,
-        bottom: sprite ? `${58 - (lane % 2) * 8}px` : `${58 - (lane % 2) * 10}px`,
-        zIndex: sprite ? 1 : 3 + (lane % 2),
+        bottom: sprite && half ? `${58 - (lane % 2) * 8}px` : sprite ? `${62 - (lane % 2) * 8}px` : `${58 - (lane % 2) * 10}px`,
+        zIndex: sprite && half ? 1 : 3 + (lane % 2),
       }}
     >
       <div className="walker-face" style={timing}>
@@ -331,7 +336,7 @@ export function Walker({ index, worker }) {
             src={sprite}
             alt=""
             draggable={false}
-            className={`walker-sprite ${worker.rarity >= 6 ? "glow" : ""}`}
+            className={`walker-sprite ${half ? "" : "full-body"} ${worker.rarity >= 6 ? "glow" : ""}`}
             style={{ animationDelay: `${-index * 0.37}s` }}
           />
         ) : (
