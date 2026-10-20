@@ -2710,7 +2710,7 @@ input:focus-visible {
 }
 
 .walker-sprite.glow {
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  filter: drop-shadow(0 0 3px rgba(255, 240, 200, 0.55)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
 }
 
 .walker.has-sprite .ore-sack {
