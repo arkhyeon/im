@@ -163,6 +163,20 @@ export const ORES = [
 export const STAGE_HP = { base: 10, growth: 1.27 };
 export const STAGE_MULT_GROWTH = 1.03;
 
+// ---------- 손맛 요소 ----------
+// 콤보: 1.2초 안에 계속 탭하면 1탭마다 피해 +1%, 최대 100콤보(x2)
+export const COMBO = { window: 1200, per: 0.01, max: 100, milestones: [25, 50, 100] };
+// 약점: 광석 위에서 깜빡이는 표적을 맞히면 무조건 치명타 + 피해 x2
+export const WEAK = { mult: 2, radius: 28, moveMs: 3500 };
+// 보물 광석: 광석을 부술 때 3% 확률로 다음 광석이 보물 광석 (HP x3, 파괴 보너스 x10, 부산물 x5)
+export const TREASURE = { chance: 0.03, hpMult: 3, bonusMult: 10, itemMult: 5 };
+// 스킬: 쿨타임이 돌면 다시 쓸 수 있어요
+export const SKILLS = [
+  { id: "dynamite", icon: "💣", name: "다이너마이트", desc: "탭 30번 분량 피해", cooldown: 45, power: 30 },
+  { id: "golden", icon: "✨", name: "황금 손", desc: "15초 동안 탭 골드 x3", cooldown: 120, duration: 15, mult: 3 },
+  { id: "rally", icon: "📣", name: "총동원", desc: "15초 동안 광부 x10", cooldown: 180, duration: 15, mult: 10 },
+];
+
 // ---------- 부산물 시장 ----------
 // 모든 부산물은 같은 가격에서 시작하고, 어느 광석에서든 랜덤으로 나와요.
 // 20분마다 많이 팔린 건 싸지고 덜 팔린 건 비싸져요.

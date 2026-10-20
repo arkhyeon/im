@@ -22,6 +22,7 @@ import {
   STAGE_BREAKS,
   STAGE_HP,
   STAGE_MULT_GROWTH,
+  TREASURE,
   TRIBES,
   TRIBE_STEPS,
   WORKER_GOLD,
@@ -181,6 +182,8 @@ export const canChallengeBoss = (g) =>
   g.stageLevel < STAGE_COUNT - 1 && isBossGate(g.stageLevel) && g.stage === g.stageLevel && g.stageBreaks >= BOSS.breaksNeeded;
 export const bossHpOf = (stageLevel) => stageOf(stageLevel).hp * BOSS.hpMult;
 export const incomeOf = (g, st = statsOf(g)) => st.workerPower * stageOf(g.stage).mult * st.goldMult * WORKER_GOLD;
+// 지금 캐는 광석의 HP (보물 광석이면 3배)
+export const oreHpOf = (g) => stageOf(g.stage).hp * (g.treasure ? TREASURE.hpMult : 1);
 
 export const addGold = (g, amount) => ({
   ...g,
@@ -192,19 +195,23 @@ export const addGold = (g, amount) => ({
 // 피해를 주고 골드·파괴 보상·부산물을 계산. rolls는 미리 뽑아 둔 난수 (state 업데이트를 순수하게 유지)
 export const applyDamage = (g, damage, st, rolls, goldFactor) => {
   const stage = stageOf(g.stage);
+  const hp = oreHpOf(g);
   let next = addGold(g, damage * stage.mult * st.goldMult * goldFactor);
   const total = g.oreDamage + damage;
-  const breaks = Math.floor(total / stage.hp);
-  next.oreDamage = total - breaks * stage.hp;
+  // 보물 광석은 한 번에 하나만 부서지고 남는 피해는 버려요
+  const breaks = g.treasure ? Math.min(1, Math.floor(total / hp)) : Math.floor(total / hp);
+  next.oreDamage = g.treasure && breaks ? 0 : total - breaks * hp;
   if (!breaks) return next;
 
   let r = 0;
   const roll = () => rolls[r++ % rolls.length];
-  const bonus = breaks * stage.hp * stage.mult * BREAK_BONUS * st.breakMult * st.goldMult;
+  const treasure = Boolean(g.treasure);
+  const bonus = breaks * stage.hp * stage.mult * BREAK_BONUS * st.breakMult * st.goldMult * (treasure ? TREASURE.bonusMult : 1);
   next = addGold(next, bonus);
+  next.treasure = roll() < TREASURE.chance;
 
   // 부산물은 어느 광석에서든 8종 중 랜덤, 높은 단계일수록 많이
-  const scale = 1.03 ** g.stage * st.dropMult;
+  const scale = 1.03 ** g.stage * st.dropMult * (treasure ? TREASURE.itemMult : 1);
   const items = {};
   const rolled = Math.min(breaks, 20);
   for (let i = 0; i < rolled; i++) {
@@ -235,7 +242,8 @@ export const applyDamage = (g, damage, st, rolls, goldFactor) => {
     }
   }
   next = bumpDaily(next, "breaks", breaks);
-  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, stage: g.stage, breaks, bonus, items, unlocked };
+  if (unlocked !== null) next.treasure = false;
+  next.lastBreak = { seq: (g.lastBreak?.seq || 0) + 1, stage: g.stage, breaks, bonus, items, unlocked, treasure, newTreasure: Boolean(next.treasure) };
   return next;
 };
 
@@ -339,6 +347,7 @@ export const normalize = (saved) => {
     stageLevel,
     stage: typeof s.stage === "number" ? Math.min(stageLevel, Math.max(0, Math.floor(num(s.stage)))) : stageLevel,
     stageBreaks: Math.floor(num(s.stageBreaks)),
+    treasure: Boolean(s.treasure),
     oreDamage: typeof s.stage === "number" ? num(s.oreDamage) : 0,
     oreBreaks,
     byproducts: counts(s.byproducts, BYPRODUCTS),

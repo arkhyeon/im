@@ -2477,3 +2477,146 @@ input:focus-visible {
   opacity: 0.4;
   cursor: default;
 }
+
+/* ================= 손맛: 콤보 · 약점 · 스킬 · 보물 광석 · 흔들림 ================= */
+
+.scene.shaking {
+  animation: scene-shake 0.25s linear infinite;
+}
+
+@keyframes scene-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 2px); }
+  50% { transform: translate(3px, -3px); }
+  75% { transform: translate(-2px, -2px); }
+}
+
+.scene.golden {
+  box-shadow: inset 0 0 60px rgba(255, 213, 74, 0.6), 0 0 20px rgba(255, 213, 74, 0.5);
+}
+
+.weak-point {
+  position: absolute;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 3px solid #ff5252;
+  background: radial-gradient(circle, rgba(255, 82, 82, 0.9) 0 18%, transparent 20% 45%, rgba(255, 82, 82, 0.35) 47% 60%, transparent 62%);
+  box-shadow: 0 0 12px #ff5252;
+  animation: weak-pulse 0.7s ease-in-out infinite alternate, pop-in 0.25s;
+}
+
+@keyframes weak-pulse {
+  from { transform: scale(0.85); }
+  to { transform: scale(1.15); }
+}
+
+.fx-text.weak {
+  font-size: 32px;
+  color: #ff5252;
+  text-shadow: 0 2px 0 #4a0000, 0 0 14px #ff8a80;
+}
+
+.fx-text.boom {
+  font-size: 40px;
+  color: #ffeb3b;
+  text-shadow: 0 3px 0 #b71c1c, 0 0 24px #ff6d00;
+  animation-duration: 1.1s;
+}
+
+.combo {
+  position: absolute;
+  top: 44px;
+  right: 14px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #fff;
+  background: linear-gradient(90deg, #ff6d00, #ff3d00);
+  box-shadow: 0 0 12px rgba(255, 109, 0, 0.7);
+  pointer-events: none;
+  animation: pop-in 0.2s;
+}
+
+.combo b {
+  font-size: 18px;
+  font-weight: normal;
+}
+
+.combo.max {
+  background: linear-gradient(90deg, #ff5c8a, #ffd54a, #7ef9ff);
+  animation: pop-in 0.2s, rainbow 1.5s linear infinite;
+}
+
+.rock-wrap.treasure .rock {
+  filter: drop-shadow(0 0 18px #ffd54a) sepia(0.6) saturate(2.2) brightness(1.15);
+}
+
+.skill-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.skill {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: linear-gradient(var(--panel), var(--panel-deep));
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 4px 0 #120c1c;
+}
+
+.skill:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #120c1c;
+}
+
+.skill.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(255, 213, 74, 0.7);
+}
+
+.skill.cooling {
+  cursor: default;
+  color: var(--ink-dim);
+}
+
+.skill-cd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.skill-icon {
+  position: relative;
+  font-size: 22px;
+}
+
+.skill-name {
+  position: relative;
+  font-size: 13px;
+}
+
+.skill-state {
+  position: relative;
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.2;
+}
