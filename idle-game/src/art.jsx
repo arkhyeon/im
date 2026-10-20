@@ -300,8 +300,13 @@ export function WorkerPortrait({ worker, size = 56, full = false }) {
   );
 }
 
-// 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 꼬마 일꾼
-export function Walker({ index, look, rarity = 0 }) {
+// 배경을 지운 걷기용 그림 (src/assets/sprites/광부ID.webp). 없으면 SVG 꼬마 광부로 걸어요.
+const WORKER_SPRITES = import.meta.glob("./assets/sprites/*.{webp,png}", { eager: true, import: "default" });
+export const workerSpriteOf = (id) => WORKER_SPRITES[`./assets/sprites/${id}.webp`] || WORKER_SPRITES[`./assets/sprites/${id}.png`] || null;
+
+// 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 광부
+export function Walker({ index, worker }) {
+  const sprite = workerSpriteOf(worker.id);
   const fromLeft = index % 2 === 0;
   const lane = Math.floor(index / 2);
   const timing = {
@@ -310,18 +315,28 @@ export function Walker({ index, look, rarity = 0 }) {
   };
   return (
     <div
-      className="walker"
+      className={`walker ${sprite ? "has-sprite" : ""}`}
       style={{
         ...timing,
-        "--from": fromLeft ? `${-6 + lane * 2}%` : `${94 - lane * 2}%`,
-        "--to": fromLeft ? `${18 + lane * 4}%` : `${70 - lane * 4}%`,
+        "--from": fromLeft ? `${-8 + lane * 2}%` : `${92 - lane * 2}%`,
+        "--to": fromLeft ? `${16 + lane * 4}%` : `${68 - lane * 4}%`,
         "--dir": fromLeft ? 1 : -1,
-        bottom: `${58 - (lane % 2) * 10}px`,
-        zIndex: 3 + (lane % 2),
+        bottom: sprite ? `${44 - (lane % 2) * 6}px` : `${58 - (lane % 2) * 10}px`,
+        zIndex: sprite ? 1 : 3 + (lane % 2),
       }}
     >
       <div className="walker-face" style={timing}>
-        <WorkerIcon size={54} look={look} rarity={rarity} delay={index * 0.2} />
+        {sprite ? (
+          <img
+            src={sprite}
+            alt=""
+            draggable={false}
+            className={`walker-sprite ${worker.rarity >= 6 ? "glow" : ""}`}
+            style={{ animationDelay: `${-index * 0.37}s` }}
+          />
+        ) : (
+          <WorkerIcon size={54} look={worker.look} rarity={worker.rarity} delay={index * 0.2} />
+        )}
         <span className="ore-sack" style={timing} />
       </div>
     </div>

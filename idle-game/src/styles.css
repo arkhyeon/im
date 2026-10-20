@@ -2689,3 +2689,33 @@ input:focus-visible {
   color: #fff;
   text-shadow: 0 1px 3px #000, 0 0 6px #000;
 }
+
+/* 일러스트 광부가 광산을 걸어 다닐 때: 아랫부분은 땅 뒤로 숨어요 */
+.ground {
+  z-index: 2;
+}
+
+.walker-sprite {
+  display: block;
+  height: 84px;
+  width: auto;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  animation: sprite-walk 0.9s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.walker-sprite.glow {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+.walker.has-sprite .ore-sack {
+  top: 34px;
+  left: 6px;
+}
+
+@keyframes sprite-walk {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}

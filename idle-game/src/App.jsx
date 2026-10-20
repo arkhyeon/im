@@ -1071,7 +1071,7 @@ function Game({ user, onExit }) {
         )}
         <div className="ground" />
         {walkers.map((w, i) => (
-          <Walker key={i} index={i} look={w.look} rarity={w.rarity} />
+          <Walker key={`${w.id}-${i}`} index={i} worker={w} />
         ))}
         {bat && !fighting && (
           <button
