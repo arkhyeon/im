@@ -2697,7 +2697,10 @@ input:focus-visible {
 
 .walker-sprite {
   display: block;
-  height: 84px;
+  height: 80px;
+  max-width: 82px;
+  object-fit: contain;
+  object-position: 50% 100%;
   width: auto;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
   animation: sprite-walk 0.9s ease-in-out infinite;

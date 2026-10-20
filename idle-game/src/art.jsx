@@ -318,10 +318,10 @@ export function Walker({ index, worker }) {
       className={`walker ${sprite ? "has-sprite" : ""}`}
       style={{
         ...timing,
-        "--from": fromLeft ? `${-8 + lane * 2}%` : `${92 - lane * 2}%`,
-        "--to": fromLeft ? `${16 + lane * 4}%` : `${68 - lane * 4}%`,
+        "--from": fromLeft ? `${-10 + lane * 3}%` : `${90 - lane * 3}%`,
+        "--to": fromLeft ? `${4 + lane * 8}%` : `${74 - lane * 8}%`,
         "--dir": fromLeft ? 1 : -1,
-        bottom: sprite ? `${44 - (lane % 2) * 6}px` : `${58 - (lane % 2) * 10}px`,
+        bottom: sprite ? `${58 - (lane % 2) * 8}px` : `${58 - (lane % 2) * 10}px`,
         zIndex: sprite ? 1 : 3 + (lane % 2),
       }}
     >
