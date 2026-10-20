@@ -43,7 +43,7 @@ import {
   tribeStatusOf,
   workerById,
 } from "./game";
-import { ByproductIcon, CharmIcon, CoinIcon, EquipIcon, Sparkline, WorkerIcon } from "./art";
+import { ByproductIcon, CharmIcon, CoinIcon, EquipIcon, Sparkline, WorkerPortrait } from "./art";
 
 function SubTabs({ items, value, onChange }) {
   return (
@@ -298,7 +298,7 @@ export function WorkersPanel({ game, stats, adsLeft, watchingAd, onAdPull, onPul
                     style={{ "--rc": RARITIES[w.rarity].color }}
                     onClick={() => setSelected(w.id)}
                   >
-                    <WorkerIcon look={w.look} rarity={w.rarity} size={56} still />
+                    <WorkerPortrait worker={w} size={56} />
                     {count > 0 && <span className="bag-count">{count}</span>}
                   </button>
                 );
@@ -307,7 +307,7 @@ export function WorkersPanel({ game, stats, adsLeft, watchingAd, onAdPull, onPul
           )}
           {picked && (
             <section className="detail" style={{ "--rc": RARITIES[picked.rarity].color }}>
-              <WorkerIcon look={picked.look} rarity={picked.rarity} size={110} />
+              <WorkerPortrait worker={picked} size={150} full />
               <div className="info">
                 <div className="name">
                   {game.workers[picked.id] ? picked.name : "???"} <span className="rarity-chip">{RARITIES[picked.rarity].name}</span>
@@ -356,7 +356,7 @@ export function WorkersPanel({ game, stats, adsLeft, watchingAd, onAdPull, onPul
               <div className="synergy-members">
                 {t.members.map((w) => (
                   <span key={w.id} className={game.workers[w.id] ? "" : "missing"}>
-                    <WorkerIcon look={w.look} rarity={w.rarity} size={44} still />
+                    <WorkerPortrait worker={w} size={44} />
                   </span>
                 ))}
               </div>
@@ -376,7 +376,7 @@ export function WorkersPanel({ game, stats, adsLeft, watchingAd, onAdPull, onPul
                   const w = workerById(id);
                   return (
                     <span key={id} className={game.workers[id] ? "" : "missing"}>
-                      <WorkerIcon look={w.look} rarity={w.rarity} size={44} still />
+                      <WorkerPortrait worker={w} size={44} />
                     </span>
                   );
                 })}

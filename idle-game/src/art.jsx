@@ -279,6 +279,27 @@ export function WorkerIcon({ look, rarity = 0, size = 52, delay = 0, still = fal
   );
 }
 
+// 일러스트가 있는 광부는 그림 파일로, 없으면 SVG로 보여줘요.
+// src/assets/workers/광부ID.webp(또는 .png) 파일만 넣으면 자동으로 바뀌어요.
+const WORKER_ART = import.meta.glob("./assets/workers/*.{webp,png,jpg}", { eager: true, import: "default" });
+export const workerArtOf = (id) =>
+  WORKER_ART[`./assets/workers/${id}.webp`] || WORKER_ART[`./assets/workers/${id}.png`] || WORKER_ART[`./assets/workers/${id}.jpg`] || null;
+
+// full: 카드 그림 전체, 아니면 얼굴 중심으로 자른 정사각형 썸네일
+export function WorkerPortrait({ worker, size = 56, full = false }) {
+  const art = workerArtOf(worker.id);
+  if (!art) return <WorkerIcon look={worker.look} rarity={worker.rarity} size={size} still />;
+  return (
+    <img
+      src={art}
+      alt=""
+      className={`worker-art ${full ? "full" : "thumb"}`}
+      style={full ? { height: size } : { width: size, height: size }}
+      draggable={false}
+    />
+  );
+}
+
 // 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 꼬마 일꾼
 export function Walker({ index, look, rarity = 0 }) {
   const fromLeft = index % 2 === 0;

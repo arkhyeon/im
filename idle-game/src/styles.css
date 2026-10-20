@@ -2642,3 +2642,50 @@ input:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 광부 일러스트 */
+.worker-art {
+  display: block;
+  border-radius: 8px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.worker-art.thumb {
+  object-fit: cover;
+  object-position: 50% 22%;
+}
+
+.worker-art.full {
+  width: auto;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--rc, transparent), 0 0 18px var(--rc, transparent);
+}
+
+.bag-slot .worker-art.thumb {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 7px;
+}
+
+.bag-slot.locked .worker-art,
+.synergy-members .missing .worker-art {
+  filter: brightness(0.12) blur(1px);
+}
+
+.pull-card .worker-art.thumb {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1;
+}
+
+.detail .worker-art.full {
+  flex: none;
+}
+
+.pull-card.r8 .pull-name,
+.pull-card.r8 .pull-rarity {
+  color: #fff;
+  text-shadow: 0 1px 3px #000, 0 0 6px #000;
+}

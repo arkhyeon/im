@@ -70,7 +70,7 @@ import {
 } from "./game";
 import { useMarket } from "./market";
 import { buzz, isMuted, setMuted as saveMuted, sfx } from "./sound";
-import { BatIcon, ByproductIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon } from "./art";
+import { BatIcon, ByproductIcon, CharmIcon, ChestIcon, CoinIcon, GoogleLogo, OreItemIcon, OreRock, Walker, WorkerIcon, WorkerPortrait } from "./art";
 import { CharmsPanel, EquipPanel, MarketPanel, MissionsPanel, PrestigePanel, WorkersPanel } from "./panels";
 
 const MAX_WALKERS = 8;
@@ -1273,7 +1273,7 @@ function Game({ user, onExit }) {
             <div className="merging">
               {mergeResult.results[0].mats.map((m, i) => (
                 <span key={i} className={`merge-mat m${i}`}>
-                  {mergeResult.kind === "worker" ? <WorkerIcon look={m.look} rarity={m.rarity} size={80} still /> : <CharmIcon type={m.type} rarity={m.rarity} size={52} />}
+                  {mergeResult.kind === "worker" ? <WorkerPortrait worker={m} size={72} /> : <CharmIcon type={m.type} rarity={m.rarity} size={52} />}
                 </span>
               ))}
               <div className="merge-core" />
@@ -1293,7 +1293,7 @@ function ResultCard({ kind, item, big, delay = 0, isNew, failed }) {
     <div className={`pull-card r${item.rarity} ${failed ? "failed" : ""}`} style={{ "--rc": RARITIES[item.rarity].color, animationDelay: `${delay}s` }}>
       {isNew && <span className="new-tag">NEW</span>}
       {kind === "worker" ? (
-        <WorkerIcon look={item.look} rarity={item.rarity} size={big ? 120 : 56} still />
+        <WorkerPortrait worker={item} size={big ? 220 : 52} full={big} />
       ) : (
         <CharmIcon type={item.type} rarity={item.rarity} size={big ? 64 : 38} />
       )}
