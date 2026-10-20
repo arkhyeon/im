@@ -2430,3 +2430,17 @@ input:focus-visible {
   max-height: 50vh;
   overflow-y: auto;
 }
+
+/* 세로로 긴 광부 소녀 그림 */
+.bag-slot svg {
+  max-height: 92%;
+  width: auto;
+}
+
+.ore-sack {
+  top: 30px;
+}
+
+.pull-card {
+  justify-content: flex-end;
+}

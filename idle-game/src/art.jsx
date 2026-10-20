@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { MATERIALS, RARITIES } from "./data";
 
 /* 모든 그림은 이미지 파일 없이 SVG로 그려요. 재질·등급이 오를수록 색과 장식이 바뀌어요. */
@@ -111,118 +112,168 @@ export function OreItemIcon({ ore, size = 28 }) {
 }
 
 // ---------- 광부 (미소녀) ----------
+// viewBox 64×88 세로 그림. size는 높이(px)예요.
 const BACK_HAIR = {
-  long: <path d="M15.5 22 Q13 44 19 50 L41 50 Q47 44 44.5 22 Z" />,
-  ponytail: <path d="M41 15 Q57 17 52 39 Q50 30 44 25 Z" />,
+  long: <path d="M14 24 Q9 50 15 68 L21 62 L25 69 L32 64 L39 69 L43 62 L49 68 Q55 50 50 24 Z" />,
+  ponytail: <path d="M44 10 Q63 14 59 42 Q57 58 49 68 Q53 50 49 34 Q47 22 41 16 Z" />,
   twin: (
     <>
-      <path d="M17 17 Q4 28 10 47 Q14 36 19 27 Z" />
-      <path d="M43 17 Q56 28 50 47 Q46 36 41 27 Z" />
+      <path d="M19 15 Q1 28 6 54 Q8 66 4 76 Q15 68 17 52 Q19 34 23 22 Z" />
+      <path d="M45 15 Q63 28 58 54 Q56 66 60 76 Q49 68 47 52 Q45 34 41 22 Z" />
     </>
   ),
-  bob: <path d="M15.5 22 Q15 37 21 38 L39 38 Q45 37 44.5 22 Z" />,
+  bob: <path d="M14 24 Q11 42 17 48 L47 48 Q53 42 50 24 Z" />,
   braid: (
     <>
-      <circle cx="43" cy="31" r="3.3" />
-      <circle cx="44" cy="37" r="3.1" />
-      <circle cx="44.5" cy="43" r="2.8" />
+      <path d="M14 24 Q12 40 18 46 L46 46 Q52 40 50 24 Z" />
+      {[38, 45, 52, 59].map((y, i) => (
+        <ellipse key={y} cx={47 + i * 0.6} cy={y} rx="4" ry="4.2" />
+      ))}
     </>
   ),
-  bun: <circle cx="30" cy="7" r="5.5" />,
+  bun: (
+    <>
+      <path d="M14 24 Q11 44 18 50 L46 50 Q53 44 50 24 Z" />
+      <circle cx="32" cy="4" r="6.5" />
+    </>
+  ),
 };
 
-export function WorkerIcon({ look, rarity = 0, size = 44, delay = 0, still = false }) {
+export function WorkerIcon({ look, rarity = 0, size = 52, delay = 0, still = false }) {
+  const uid = useId().replace(/:/g, "");
   const has = (key) => look.extra?.split(" ").includes(key);
-  const skin = look.skin || "#ffe3cf";
+  const skin = look.skin || "#ffe6d5";
   const accent = RARITIES[rarity].color;
   const classes = [has("spirit") ? "spirit-glow" : "", rarity >= 8 ? "rainbow-glow" : ""].join(" ");
+  const eye = (cx, flip) => (
+    <g>
+      <ellipse cx={cx} cy="29" rx="3.7" ry="4.6" fill="#fff" />
+      <ellipse cx={cx} cy="29.4" rx="3.1" ry="4.1" fill={`url(#iris-${uid})`} />
+      <ellipse cx={cx} cy="30" rx="1.4" ry="2.1" fill="rgba(20,10,20,.75)" />
+      <circle cx={cx - 1.2} cy="27.3" r="1.25" fill="#fff" />
+      <circle cx={cx + 1.1} cy="31.4" r=".6" fill="#fff" />
+      <path
+        d={flip ? `M${cx + 4} 25.4 Q${cx} 23.6 ${cx - 3.9} 25.6 L${cx - 4.8} 25` : `M${cx - 4} 25.4 Q${cx} 23.6 ${cx + 3.9} 25.6 L${cx + 4.8} 25`}
+        stroke="#2b1a24"
+        strokeWidth="1.5"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </g>
+  );
   return (
-    <svg viewBox="0 0 60 60" width={size} height={size} className={classes} aria-hidden="true">
+    <svg viewBox="0 0 64 88" width={size * (64 / 88)} height={size} className={classes} aria-hidden="true">
+      <defs>
+        <linearGradient id={`iris-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1a1020" />
+          <stop offset=".45" stopColor={look.eyes} />
+          <stop offset="1" stopColor="#fff" stopOpacity=".9" />
+        </linearGradient>
+        <linearGradient id={`hair-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={look.hair} />
+          <stop offset="1" stopColor={look.hair} stopOpacity=".78" />
+        </linearGradient>
+      </defs>
       <g className={still ? "" : "bob"} style={{ animationDelay: `${delay}s` }}>
-        {has("cape") && <path d="M19 36 L12 57 L48 57 L41 36 Z" fill={accent} opacity=".85" />}
-        {has("tail") && <path d="M40 49 Q55 51 55 40 Q57 33 52 31 Q53 42 40 45 Z" fill={look.hair} />}
-        <g fill={look.hair}>
-          <circle cx="30" cy="22" r="14.5" />
+        {has("cape") && <path d="M21 44 L10 84 L54 84 L43 44 Z" fill={accent} opacity=".85" />}
+        {has("tail") && <path d="M42 66 Q60 68 60 54 Q62 46 56 43 Q57 58 42 61 Z" fill={look.hair} />}
+        <g fill={`url(#hair-${uid})`}>
+          <ellipse cx="32" cy="23" rx="18" ry="18" />
           {BACK_HAIR[look.style]}
         </g>
         {look.style === "twin" && (
           <>
-            <circle cx="17.5" cy="18" r="2.4" fill={look.accent} />
-            <circle cx="42.5" cy="18" r="2.4" fill={look.accent} />
+            <path d="M16 14 L21 12 L20 19 Z M14 18 L20 16 L18 22 Z" fill={look.accent} />
+            <path d="M48 14 L43 12 L44 19 Z M50 18 L44 16 L46 22 Z" fill={look.accent} />
           </>
         )}
-        <g className={still ? "" : "swing"} style={{ transformOrigin: "42px 42px", animationDelay: `${delay}s` }}>
-          <rect x="41" y="20" width="2.6" height="25" rx="1.3" fill={rarity >= 4 ? "#4a148c" : "#8b5a2b"} />
-          <path d="M32 22 Q42 13 53 21 L51 24 Q42 18 34 25 Z" fill={rarity ? accent : "#b0bec5"} />
+        {look.style === "ponytail" && <path d="M41 13 L46 9 L47 15 Z" fill={look.accent} />}
+        <g className={still ? "" : "swing"} style={{ transformOrigin: "47px 54px", animationDelay: `${delay}s` }}>
+          <rect x="46" y="30" width="2.6" height="28" rx="1.3" fill={rarity >= 4 ? "#4a148c" : "#8b5a2b"} />
+          <path d="M37 32 Q47 23 58 31 L56 34 Q47 28 39 35 Z" fill={rarity ? accent : "#b0bec5"} />
         </g>
-        <rect x="23.5" y="49" width="5" height="7" rx="2" fill={skin} />
-        <rect x="31.5" y="49" width="5" height="7" rx="2" fill={skin} />
-        <rect x="23" y="54.5" width="6" height="3" rx="1.5" fill="#5d4037" />
-        <rect x="31" y="54.5" width="6" height="3" rx="1.5" fill="#5d4037" />
-        <path d="M21.5 35 Q30 32 38.5 35 L43 51 Q30 55 17 51 Z" fill={look.outfit} />
-        <path d="M17.5 49.5 Q30 53 42.5 49.5" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" fill="none" />
-        <path d="M26.5 35 L30 38.5 L33.5 35" fill="none" stroke={look.accent} strokeWidth="1.8" />
-        <path d="M27 39.5 L30 41 L33 39.5 L30 42.5 Z" fill={look.accent} />
+        <rect x="26" y="68" width="4.6" height="12" rx="2" fill={skin} />
+        <rect x="33.4" y="68" width="4.6" height="12" rx="2" fill={skin} />
+        <path d="M24.5 77 h7 a1 1 0 0 1 1 1 v4 a2 2 0 0 1 -2 2 h-6.5 a2 2 0 0 1 -2 -2 v-2 z" fill="#5d4037" />
+        <path d="M32.5 77 h7 l1 3 v2 a2 2 0 0 1 -2 2 h-6 a2 2 0 0 1 -2 -2 v-4 z" fill="#5d4037" />
+        <rect x="24.5" y="76" width="8" height="2" fill={look.accent} />
+        <rect x="31.5" y="76" width="8" height="2" fill={look.accent} />
+        <path d="M24 46 Q32 43 40 46 L42 58 L22 58 Z" fill={look.outfit} />
+        <path d="M22 57 L42 57 L49 70 Q32 74 15 70 Z" fill={look.outfit} />
+        <path d="M15 70 Q17.5 72.5 20 70.6 Q22.5 73 25 71.2 Q27.5 73.6 30 71.6 Q32.5 74 35 71.6 Q37.5 73.6 40 71.2 Q42.5 73 45 70.6 Q47.5 72.5 49 70 L49 71.5 Q32 76 15 71.5 Z" fill="#fff" opacity=".9" />
+        <path d="M22.5 58 L41.5 58" stroke="rgba(0,0,0,.25)" strokeWidth="1.4" />
+        <path d="M26 45.5 L32 51 L38 45.5 L35 45 L32 48 L29 45 Z" fill="#fff" />
+        <path d="M29.5 50 Q32 52.5 34.5 50 L36 54 L32 52 L28 54 Z" fill={look.accent} />
         {has("dynamite") && (
           <>
-            <rect x="20" y="43" width="2.6" height="6" rx="1" fill="#d32f2f" />
-            <rect x="23.2" y="43" width="2.6" height="6" rx="1" fill="#d32f2f" />
+            <rect x="23" y="58" width="2.4" height="7" rx="1" fill="#d32f2f" />
+            <rect x="26" y="58" width="2.4" height="7" rx="1" fill="#d32f2f" />
           </>
         )}
         {has("golem") && (
           <>
-            <path d="M15 40 L20 33.5 L24 38 L19 42 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
-            <path d="M45 40 L40 33.5 L36 38 L41 42 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
+            <path d="M16 50 L22 43.5 L26 48 L20 53 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
+            <path d="M48 50 L42 43.5 L38 48 L44 53 Z" fill="#9e9e9e" stroke="#616161" strokeWidth="1" />
           </>
         )}
-        <circle cx="18.5" cy="44" r="2.4" fill={skin} />
-        <circle cx="41.5" cy="43" r="2.4" fill={skin} />
-        <circle cx="30" cy="23" r="13" fill={skin} />
-        <ellipse cx="25" cy="25.5" rx="2.6" ry="3.4" fill={look.eyes} />
-        <ellipse cx="35" cy="25.5" rx="2.6" ry="3.4" fill={look.eyes} />
-        <circle cx="24.1" cy="24.2" r="1.05" fill="#fff" />
-        <circle cx="34.1" cy="24.2" r="1.05" fill="#fff" />
-        <circle cx="25.8" cy="27.2" r="0.5" fill="#fff" />
-        <circle cx="35.8" cy="27.2" r="0.5" fill="#fff" />
-        <ellipse cx="21.5" cy="29.5" rx="2.3" ry="1.2" fill="#ff8a80" opacity=".55" />
-        <ellipse cx="38.5" cy="29.5" rx="2.3" ry="1.2" fill="#ff8a80" opacity=".55" />
-        <path d="M28.6 30.6 Q30 31.9 31.4 30.6" stroke="#c2185b" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-        <path d="M17 24 Q16 10 30 9 Q44 10 43 24 Q41 17 37.5 16 Q35.5 20.5 31.5 17 Q28.5 21 24.5 17 Q20.5 18 17 24 Z" fill={look.hair} />
+        <path d="M23.5 46.5 Q19 50 19.5 57" stroke={look.outfit} strokeWidth="4.4" fill="none" strokeLinecap="round" />
+        <path d="M40.5 46.5 Q45 49 46.5 54" stroke={look.outfit} strokeWidth="4.4" fill="none" strokeLinecap="round" />
+        <circle cx="19.6" cy="58.6" r="2.3" fill={skin} />
+        <circle cx="46.8" cy="55.6" r="2.3" fill={skin} />
+        <rect x="29.5" y="40" width="5" height="6" fill={skin} />
+        <path d="M18 25 Q18 11 32 11 Q46 11 46 25 Q46 37 32 43 Q18 37 18 25 Z" fill={skin} />
+        {eye(26.3, false)}
+        {eye(37.7, true)}
+        <path d="M23.6 21 Q26 19.9 28.4 20.6 M35.6 20.6 Q38 19.9 40.4 21" stroke={look.hair} strokeWidth=".8" fill="none" strokeLinecap="round" opacity=".8" />
+        <ellipse cx="23" cy="34" rx="2.6" ry="1.3" fill="#ff8a95" opacity=".5" />
+        <ellipse cx="41" cy="34" rx="2.6" ry="1.3" fill="#ff8a95" opacity=".5" />
+        <path d="M30.6 36 Q32 37.4 33.4 36" stroke="#c2185b" strokeWidth="1" fill="none" strokeLinecap="round" />
+        <g fill={`url(#hair-${uid})`}>
+          <path d="M18.5 22 Q15 38 17.5 50 Q20.5 40 21.5 28 Z" />
+          <path d="M45.5 22 Q49 38 46.5 50 Q43.5 40 42.5 28 Z" />
+          <path d="M16.5 27 Q15 8 32 7 Q49 8 47.5 27 Q45.5 18 41.5 16 L40 24 Q37.5 17 34.5 15.5 L32.5 23 Q30 16 27.5 16 L25 24 Q22.5 17 19.5 20 Z" />
+        </g>
+        <path d="M21 15 Q32 8 43 15" stroke="#fff" strokeOpacity=".4" strokeWidth="1.6" fill="none" strokeLinecap="round" />
         {has("helmet") && (
           <>
-            <path d="M16.5 17 A13.5 11 0 0 1 43.5 17 Z" fill={look.accent} />
-            <rect x="15" y="15.5" width="30" height="3" rx="1.5" fill="rgba(0,0,0,.22)" />
-            <circle cx="30" cy="10.5" r="2.4" fill="#fff59d" />
+            <path d="M15.5 17 A16.5 12.5 0 0 1 48.5 17 Z" fill={look.accent} />
+            <path d="M20 12 Q32 5 44 12" stroke="#fff" strokeOpacity=".45" strokeWidth="1.6" fill="none" />
+            <rect x="13.5" y="15.6" width="37" height="3" rx="1.5" fill="rgba(0,0,0,.22)" />
+            <circle cx="32" cy="9.5" r="2.8" fill="#fff59d" stroke="#f9a825" strokeWidth=".8" />
           </>
         )}
         {has("goggles") && (
           <>
-            <rect x="17" y="13" width="26" height="2.6" fill="#5d4037" />
-            <circle cx="24" cy="14.3" r="3.6" fill={look.accent} stroke="#5d4037" strokeWidth="1.4" />
-            <circle cx="36" cy="14.3" r="3.6" fill={look.accent} stroke="#5d4037" strokeWidth="1.4" />
+            <rect x="16" y="11" width="32" height="2.8" fill="#5d4037" />
+            <circle cx="25" cy="12.4" r="4.2" fill={look.accent} stroke="#5d4037" strokeWidth="1.5" />
+            <circle cx="39" cy="12.4" r="4.2" fill={look.accent} stroke="#5d4037" strokeWidth="1.5" />
+            <circle cx="23.6" cy="11" r="1.2" fill="#fff" opacity=".8" />
+            <circle cx="37.6" cy="11" r="1.2" fill="#fff" opacity=".8" />
           </>
         )}
         {has("wizard") && (
           <>
-            <path d="M16 15 L33 -3 L44 15 Z" fill={look.outfit} />
-            <ellipse cx="30" cy="15" rx="17" ry="3" fill={look.outfit} />
-            <Sparkle x={31} y={7} size={0.35} delay={delay} color="#fff59d" />
+            <path d="M15 14 L37 -8 L49 14 Z" fill={look.outfit} />
+            <ellipse cx="32" cy="14" rx="20" ry="3.4" fill={look.outfit} />
+            <path d="M18 12.5 L46 12.5" stroke={look.accent} strokeWidth="2" />
+            <Sparkle x={34} y={3} size={0.35} delay={delay} color="#fff59d" />
           </>
         )}
-        {has("horns") && <path d="M19 12 Q13 4 16.5 -0.5 Q19.5 7 23 10 Z M41 12 Q47 4 43.5 -0.5 Q40.5 7 37 10 Z" fill="#fff3e0" stroke="#bcaaa4" strokeWidth=".8" />}
-        {has("crown") && <path d="M23 10 L25 3.5 L30 7.5 L35 3.5 L37 10 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />}
-        {has("golem") && <path d="M38 10 L41 4.5 L44 10 L41 13.5 Z" fill={look.accent} stroke="#fff" strokeWidth=".8" />}
+        {has("horns") && <path d="M20 11 Q13 3 16 -2 Q20 6 24 9 Z M44 11 Q51 3 48 -2 Q44 6 40 9 Z" fill="#fff3e0" stroke="#bcaaa4" strokeWidth=".8" />}
+        {has("crown") && <path d="M24 9 L26 2 L32 6.5 L38 2 L40 9 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />}
+        {has("golem") && <path d="M41 9 L44.5 3 L48 9 L44.5 13 Z" fill={look.accent} stroke="#fff" strokeWidth=".8" />}
         {has("spirit") && (
           <g fill={accent}>
-            <circle cx="41" cy="11" r="2.2" />
-            <circle cx="44" cy="9" r="1.6" />
-            <circle cx="44" cy="13" r="1.6" />
-            <circle cx="38" cy="9" r="1.6" />
+            <circle cx="44" cy="11" r="2.4" />
+            <circle cx="47.5" cy="9" r="1.8" />
+            <circle cx="47.5" cy="13.4" r="1.8" />
+            <circle cx="40.5" cy="9" r="1.8" />
+            <circle cx="44" cy="11" r="1.1" fill="#fff" />
           </g>
         )}
-        {has("halo") && <ellipse cx="30" cy="2.5" rx="10" ry="2.6" fill="none" stroke="#fff59d" strokeWidth="2" />}
-        {rarity >= 4 && <Sparkle x={51} y={9} size={0.5} delay={delay + 0.4} color={accent} />}
-        {rarity >= 6 && <Sparkle x={8} y={32} size={0.45} delay={delay + 0.9} color={accent} />}
+        {has("halo") && <ellipse cx="32" cy="1.5" rx="11" ry="2.6" fill="none" stroke="#fff59d" strokeWidth="2" />}
+        {rarity >= 4 && <Sparkle x={57} y={10} size={0.5} delay={delay + 0.4} color={accent} />}
+        {rarity >= 6 && <Sparkle x={7} y={40} size={0.45} delay={delay + 0.9} color={accent} />}
       </g>
     </svg>
   );
@@ -244,12 +295,12 @@ export function Walker({ index, look, rarity = 0 }) {
         "--from": fromLeft ? `${-6 + lane * 2}%` : `${94 - lane * 2}%`,
         "--to": fromLeft ? `${18 + lane * 4}%` : `${70 - lane * 4}%`,
         "--dir": fromLeft ? 1 : -1,
-        bottom: `${60 - (lane % 2) * 8}px`,
+        bottom: `${58 - (lane % 2) * 10}px`,
         zIndex: 3 + (lane % 2),
       }}
     >
       <div className="walker-face" style={timing}>
-        <WorkerIcon size={34} look={look} rarity={rarity} delay={index * 0.2} />
+        <WorkerIcon size={54} look={look} rarity={rarity} delay={index * 0.2} />
         <span className="ore-sack" style={timing} />
       </div>
     </div>

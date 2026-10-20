@@ -199,7 +199,7 @@ function Login({ onGuest }) {
         <OreRock ore={ORES[4]} />
         <div className="login-girls">
           {[WORKERS[0], WORKERS[16], WORKERS[24]].map((w) => (
-            <WorkerIcon key={w.id} look={w.look} rarity={w.rarity} size={64} />
+            <WorkerIcon key={w.id} look={w.look} rarity={w.rarity} size={92} />
           ))}
         </div>
       </div>
@@ -390,7 +390,7 @@ function Game({ user, onExit }) {
     if (!lb || lb.seq === lastBreakSeq.current) return;
     lastBreakSeq.current = lb.seq;
     const now = Date.now();
-    if (now - lastShatter.current < 400) return;
+    if (now - lastShatter.current < 1200) return;
     lastShatter.current = now;
     const ore = ORES.find((o) => o.id === lb.ore);
     const width = sceneRef.current?.clientWidth || 360;
@@ -1093,7 +1093,7 @@ function Game({ user, onExit }) {
             <div className="merging">
               {mergeResult.results[0].mats.map((m, i) => (
                 <span key={i} className={`merge-mat m${i}`}>
-                  {mergeResult.kind === "worker" ? <WorkerIcon look={m.look} rarity={m.rarity} size={56} still /> : <CharmIcon type={m.type} rarity={m.rarity} size={52} />}
+                  {mergeResult.kind === "worker" ? <WorkerIcon look={m.look} rarity={m.rarity} size={80} still /> : <CharmIcon type={m.type} rarity={m.rarity} size={52} />}
                 </span>
               ))}
               <div className="merge-core" />
@@ -1113,7 +1113,7 @@ function ResultCard({ kind, item, big, delay = 0, isNew, failed }) {
     <div className={`pull-card r${item.rarity} ${failed ? "failed" : ""}`} style={{ "--rc": RARITIES[item.rarity].color, animationDelay: `${delay}s` }}>
       {isNew && <span className="new-tag">NEW</span>}
       {kind === "worker" ? (
-        <WorkerIcon look={item.look} rarity={item.rarity} size={big ? 84 : 44} still />
+        <WorkerIcon look={item.look} rarity={item.rarity} size={big ? 120 : 56} still />
       ) : (
         <CharmIcon type={item.type} rarity={item.rarity} size={big ? 64 : 38} />
       )}
