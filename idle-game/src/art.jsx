@@ -349,38 +349,53 @@ export function Walker({ index, worker }) {
 }
 
 // ---------- 장비 ----------
+const EQUIP_LINE = "#2a1a12";
 const EQUIP_SHAPES = {
   pickaxe: (c) => (
-    <>
-      <rect x="27" y="16" width="6" height="40" rx="3" fill="#8b5a2b" transform="rotate(-20 30 36)" />
-      <path d="M6 22 Q30 2 54 18 L49 23 Q30 10 11 26 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
-      <path d="M8 21 Q30 4 52 18 L50 19 Q30 7 10 22 Z" fill="rgba(255,255,255,.45)" />
-    </>
+    <g transform="translate(30 31) rotate(-35) scale(.84) translate(-30 -31)" strokeLinejoin="round">
+      <rect x="26.5" y="13" width="7" height="45" rx="3.5" fill="#9a6235" stroke={EQUIP_LINE} strokeWidth="2" />
+      <rect x="28" y="16" width="2" height="38" rx="1" fill="rgba(255,255,255,.25)" />
+      <rect x="25.5" y="46" width="9" height="11" rx="3" fill="#5d3a1f" stroke={EQUIP_LINE} strokeWidth="2" />
+      <path d="M1 25 Q30 -8 59 25 Q30 13 1 25 Z" fill={c} stroke={EQUIP_LINE} strokeWidth="2" />
+      <path d="M8 19 Q30 -3 52 19 Q30 6 8 19 Z" fill="rgba(255,255,255,.4)" />
+      <rect x="23.5" y="7" width="13" height="12" rx="3" fill={c} stroke={EQUIP_LINE} strokeWidth="2" />
+      <rect x="23.5" y="13" width="13" height="6" rx="2" fill="rgba(0,0,0,.25)" />
+    </g>
   ),
   helmet: (c) => (
     <>
-      <path d="M10 38 A20 20 0 0 1 50 38 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
-      <rect x="6" y="37" width="48" height="6" rx="3" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
+      <path d="M10 38 A20 20 0 0 1 50 38 Z" fill={c} stroke={EQUIP_LINE} strokeWidth="2" />
+      <rect x="6" y="37" width="48" height="6" rx="3" fill={c} stroke={EQUIP_LINE} strokeWidth="2" />
       <path d="M26 19 Q30 16 34 19 L34 38 L26 38 Z" fill="rgba(255,255,255,.3)" />
       <circle cx="30" cy="27" r="5" fill="#fff59d" stroke="#c9a800" strokeWidth="1.5" />
     </>
   ),
   gloves: (c) => (
     <>
-      <path d="M18 54 L18 30 Q18 26 22 26 L22 14 Q22 11 25 11 Q28 11 28 14 L28 24 L28 10 Q28 7 31 7 Q34 7 34 10 L34 24 L34 12 Q34 9 37 9 Q40 9 40 12 L40 26 Q44 22 47 25 Q49 27 46 31 L40 42 L40 54 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
-      <rect x="16" y="46" width="26" height="9" rx="2" fill="rgba(0,0,0,.25)" />
+      <g fill={c} stroke={EQUIP_LINE} strokeWidth="2" strokeLinejoin="round">
+        <rect x="39" y="20" width="9.5" height="24" rx="4.75" transform="rotate(40 44 34)" />
+        <rect x="15" y="13" width="7.5" height="22" rx="3.75" />
+        <rect x="22.5" y="8" width="7.5" height="26" rx="3.75" />
+        <rect x="30" y="9" width="7.5" height="25" rx="3.75" />
+        <rect x="37.5" y="14" width="7" height="20" rx="3.5" />
+        <path d="M14 30 Q14 26 18 26 L42 26 Q46 26 46 30 L46 44 L14 44 Z" />
+        <rect x="12" y="43" width="36" height="13" rx="3" />
+      </g>
+      <path d="M15 32 L45 32 L45 43 L15 43 Z" fill="rgba(0,0,0,.12)" />
+      <rect x="13" y="47" width="34" height="4" fill="rgba(0,0,0,.28)" />
+      <path d="M17 16 L17 26 M24.5 11 L24.5 24 M32 12 L32 24" stroke="rgba(255,255,255,.4)" strokeWidth="2" strokeLinecap="round" />
     </>
   ),
   shirt: (c) => (
     <>
-      <path d="M20 8 L10 14 L4 28 L13 31 L15 26 L15 54 L45 54 L45 26 L47 31 L56 28 L50 14 L40 8 Q30 16 20 8 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
+      <path d="M20 8 L10 14 L4 28 L13 31 L15 26 L15 54 L45 54 L45 26 L47 31 L56 28 L50 14 L40 8 Q30 16 20 8 Z" fill={c} stroke={EQUIP_LINE} strokeWidth="2" strokeLinejoin="round" />
       <rect x="15" y="34" width="30" height="4" fill="#ffeb3b" opacity=".9" />
       <rect x="15" y="42" width="30" height="4" fill="#ffeb3b" opacity=".9" />
     </>
   ),
   pants: (c) => (
     <>
-      <path d="M14 8 L46 8 L50 54 L35 54 L30 22 L25 54 L10 54 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
+      <path d="M14 8 L46 8 L50 54 L35 54 L30 22 L25 54 L10 54 Z" fill={c} stroke={EQUIP_LINE} strokeWidth="2" strokeLinejoin="round" />
       <rect x="14" y="8" width="32" height="6" fill="rgba(0,0,0,.3)" />
       <rect x="27" y="9" width="6" height="4" rx="1" fill="#ffd54a" />
       <rect x="11" y="44" width="13" height="3" fill="#ffeb3b" />
@@ -389,7 +404,7 @@ const EQUIP_SHAPES = {
   ),
   boots: (c) => (
     <>
-      <path d="M16 8 L34 8 L34 34 Q50 34 54 44 L54 50 L12 50 L12 34 Z" fill={c} stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
+      <path d="M16 8 L34 8 L34 34 Q50 34 54 44 L54 50 L12 50 L12 34 Z" fill={c} stroke={EQUIP_LINE} strokeWidth="2" strokeLinejoin="round" />
       <rect x="10" y="48" width="46" height="7" rx="2" fill="#3e2723" />
       <path d="M40 36 Q50 37 53 45 L40 45 Z" fill="#b0bec5" />
       <path d="M18 16 L32 16 M18 22 L32 22 M18 28 L32 28" stroke="rgba(0,0,0,.3)" strokeWidth="2" />

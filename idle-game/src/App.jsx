@@ -155,10 +155,14 @@ function useDragScroll() {
       }
       drag = null;
     };
+    // 그림을 끌면 브라우저가 드래그하면서 페이지를 스크롤해버려서 막음
+    const noDrag = (e) => e.preventDefault();
     window.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("dragstart", noDrag);
     return () => {
+      window.removeEventListener("dragstart", noDrag);
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -1009,22 +1013,25 @@ function Game({ user, onExit }) {
         })}
       </div>
 
-      {!fighting && (
-        <button className={`boss-bar ${bossReady ? "ready" : ""}`} disabled={!bossReady} onClick={startBoss}>
-          {game.stageLevel >= STAGE_COUNT - 1
+      {/* 보스 전투 중에도 자리를 지켜서 아래 화면이 위로 튀지 않게 */}
+      <button className={`boss-bar ${bossReady || fighting ? "ready" : ""}`} disabled={!bossReady || fighting} onClick={startBoss}>
+        {fighting
+          ? `👑 ${stageNameOf(boss.level)} 보스 전투 중 · 탭으로만 공격!`
+          : game.stageLevel >= STAGE_COUNT - 1
             ? "⛏️ 모든 광석을 정복했어요!"
             : bossReady
               ? `👑 ${stageNameOf(game.stageLevel)} 보스 도전 · ${BOSS.seconds}초 안에 HP ${fmt(bossHpOf(game.stageLevel))} → ${nextOre.name} 해금`
               : game.stage !== game.stageLevel
                 ? `다음 단계는 가장 높은 단계(${stageNameOf(game.stageLevel)})에서 열려요`
                 : `${stageNameOf(game.stageLevel)}을 ${progressNeed}번 부수면 ${isBossGate(game.stageLevel) ? "보스 도전" : "다음 레벨"} (${Math.min(game.stageBreaks, progressNeed)}/${progressNeed})`}
-        </button>
-      )}
+      </button>
 
       <div
         className={`scene ${rushing ? "rush" : ""} ${fighting ? "boss" : ""} ${shakeUntil > now ? "shaking" : ""} ${skills.golden?.until > now ? "golden" : ""}`}
         ref={sceneRef}
         onPointerDown={tap}
+        onMouseDown={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
         style={{ "--bg1": shownOre.bg[0], "--bg2": shownOre.bg[1], "--bg3": shownOre.bg[2], "--glow": shownOre.vein[1] }}
       >
         {DUST.map((d, i) => (
