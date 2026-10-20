@@ -90,11 +90,11 @@ export const EFFECT_NAMES = {
 
 // ---------- 광부 뽑기 (가격 고정) ----------
 export const TICKETS = [
-  { id: "bronze", name: "동 티켓", cost: 500, color: "#e0975a", odds: [70, 25, 5, 0, 0, 0, 0, 0, 0] },
-  { id: "silver", name: "은 티켓", cost: 25000, color: "#dfe7ee", odds: [35, 35, 22, 7, 1, 0, 0, 0, 0] },
-  { id: "gold", name: "금 티켓", cost: 1.2e6, color: "#ffd54a", odds: [10, 25, 30, 22, 10, 3, 0, 0, 0] },
-  { id: "diamond", name: "다이아 티켓", cost: 6e7, color: "#7ef9ff", odds: [0, 5, 20, 30, 28, 12, 4, 1, 0] },
-  { id: "primal", name: "태초 티켓", cost: 4e9, color: "#ff6ad5", odds: [0, 0, 0, 10, 30, 30, 18, 9, 3] },
+  { id: "bronze", name: "동 티켓", cost: 2000, color: "#e0975a", odds: [70, 25, 5, 0, 0, 0, 0, 0, 0] },
+  { id: "silver", name: "은 티켓", cost: 1e5, color: "#dfe7ee", odds: [35, 35, 22, 7, 1, 0, 0, 0, 0] },
+  { id: "gold", name: "금 티켓", cost: 5e6, color: "#ffd54a", odds: [10, 25, 30, 22, 10, 3, 0, 0, 0] },
+  { id: "diamond", name: "다이아 티켓", cost: 2.5e8, color: "#7ef9ff", odds: [0, 5, 20, 30, 28, 12, 4, 1, 0] },
+  { id: "primal", name: "태초 티켓", cost: 1.5e10, color: "#ff6ad5", odds: [0, 0, 0, 10, 30, 30, 18, 9, 3] },
 ];
 // 천장: 금 이상 티켓을 50번 뽑는 동안 전설이 안 나오면 50번째는 전설 이상 확정
 export const PITY = { tickets: ["gold", "diamond", "primal"], limit: 50, rarity: 4 };
@@ -117,28 +117,30 @@ export const MATERIALS = [
   { name: "전설", color: "#ff6ad5" },
 ];
 export const EQUIPMENT = [
-  { id: "pickaxe", name: "곡괭이", base: 10 },
-  { id: "helmet", name: "헬멧", base: 40 },
-  { id: "gloves", name: "장갑", base: 50 },
-  { id: "shirt", name: "작업복", base: 60 },
-  { id: "pants", name: "작업 바지", base: 45 },
-  { id: "boots", name: "안전화", base: 40 },
+  { id: "pickaxe", name: "곡괭이", base: 15 },
+  { id: "helmet", name: "헬멧", base: 80 },
+  { id: "gloves", name: "장갑", base: 100 },
+  { id: "shirt", name: "작업복", base: 120 },
+  { id: "pants", name: "작업 바지", base: 90 },
+  { id: "boots", name: "안전화", base: 80 },
 ];
-// 비용 = base × 1.04^Lv × (Lv+1)
-export const EQUIP_GROWTH = 1.04;
+// 비용 = base × 1.055^Lv × (Lv+1)
+export const EQUIP_GROWTH = 1.055;
+// 곡괭이 피해 = (Lv+1) × 1.25^(Lv÷10)
+export const PICKAXE_STEP = 1.25;
 // 세트: 모든 장비가 Lv.10, 20, … 이상이면 단계마다 골드 +5%, 치명타 확률 +0.25%
 export const SET_BONUS = { gold: 0.05, critChance: 0.0025 };
 
 // ---------- 광석과 보스 ----------
-// 탭은 피해 × 3배, 광부는 피해 × 1배만큼 골드를 줘요.
-export const TAP_GOLD = 3;
+// 탭은 피해 × 2배, 광부는 피해 × 1배만큼 골드를 줘요. 부수면 HP × 1.5배 보너스.
+export const TAP_GOLD = 2;
 export const WORKER_GOLD = 1;
-export const BREAK_BONUS = 3;
-// 광석 15종 × 레벨 10 = 150단계. 가장 높은 단계를 5번 부수면 다음 레벨이 열리고,
-// 각 광석의 Lv.10을 5번 부수면 보스에 도전할 수 있어요. 보스는 탭으로만 잡아요.
+export const BREAK_BONUS = 1.5;
+// 광석 15종 × 레벨 10 = 150단계. 가장 높은 단계를 10번 부수면 다음 레벨이 열리고,
+// 각 광석의 Lv.10을 10번 부수면 보스에 도전할 수 있어요. 보스는 20초 안에 탭으로만 잡아요.
 export const ORE_LEVELS = 10;
-export const STAGE_BREAKS = 5;
-export const BOSS = { breaksNeeded: 5, hpMult: 25, seconds: 30, rewardMult: 8 };
+export const STAGE_BREAKS = 10;
+export const BOSS = { breaksNeeded: 10, hpMult: 40, seconds: 20, rewardMult: 8 };
 const ore = (id, name, faces, vein, bg) => ({ id, name, faces, vein, bg });
 export const ORES = [
   ore("stone", "돌", ["#6b5b7b", "#8f7fa6", "#574a66", "#463b55", "#7a6a90"], ["#f5f5f5", "#bdbdbd", "#8d8d8d"], ["#4a3466", "#2a1d3d", "#140d1f"]),
@@ -157,9 +159,9 @@ export const ORES = [
   ore("orichalcum", "오리하르콘", ["#7a4a20", "#a86a30", "#5e3818", "#4a2c12", "#8f5a28"], ["#fff0d0", "#ff9e40", "#d0601a"], ["#5e3510", "#301b08", "#140b03"]),
   ore("meteor", "운석", ["#5a2a24", "#8a3a2a", "#46201b", "#381814", "#7a3424"], ["#fff2c0", "#ff8a3d", "#e0301a"], ["#5e1f14", "#300f0a", "#140504"]),
 ];
-// 단계 s(0~149)의 HP와 골드 배율: 단계마다 HP ×1.2, 골드 ×1.028
-export const STAGE_HP = { base: 20, growth: 1.2 };
-export const STAGE_MULT_GROWTH = 1.028;
+// 단계 s(0~149)의 HP와 골드 배율: 단계마다 HP ×1.27, 골드 ×1.03
+export const STAGE_HP = { base: 10, growth: 1.27 };
+export const STAGE_MULT_GROWTH = 1.03;
 
 // ---------- 부산물 시장 ----------
 // 모든 부산물은 같은 가격에서 시작하고, 어느 광석에서든 랜덤으로 나와요.
@@ -191,8 +193,8 @@ export const CHARM_TYPES = [
 ];
 
 // ---------- 환생 (골드로 바로 환생, 갈수록 비싸짐) ----------
-// 비용 = base × growth^(환생 횟수), 받는 환생석 = 3 + 환생 횟수, 환생 1번마다 골드 +25% 영구
-export const PRESTIGE = { base: 1e8, growth: 8, stonesBase: 3, bonus: 0.25 };
+// 비용 = base × growth^(환생 횟수), 받는 환생석 = 3 + 환생 횟수, 환생 1번마다 골드 +50% 영구
+export const PRESTIGE = { base: 5e9, growth: 8, stonesBase: 3, bonus: 0.5 };
 
 // ---------- 기타 ----------
 export const RUSH = { perTap: 0.05, decay: 0.12, duration: 10, tapMult: 5, rateMult: 3 };

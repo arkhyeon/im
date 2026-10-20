@@ -13,6 +13,7 @@ import {
   MAX_LEVEL,
   ORE_LEVELS,
   ORES,
+  PICKAXE_STEP,
   PRESTIGE,
   QUESTS,
   RARITIES,
@@ -50,7 +51,7 @@ export const plusOf = (level) => (level ? Math.floor(((level - 1) % 100) / 10) :
 export const equipNameOf = (slot, level) =>
   level ? `${materialOf(level).name} ${slot.name}${plusOf(level) ? ` +${plusOf(level)}` : ""}` : `기본 ${slot.name}`;
 export const equipCostOf = (slot, level) => Math.floor(slot.base * EQUIP_GROWTH ** level * (level + 1));
-export const pickaxeDamageOf = (level) => (1 + level) * 1.35 ** Math.floor(level / 10);
+export const pickaxeDamageOf = (level) => (1 + level) * PICKAXE_STEP ** Math.floor(level / 10);
 export const setTierOf = (equip) => Math.floor(Math.min(...EQUIPMENT.map((e) => equip[e.id])) / 10);
 
 // 지금 골드로 연속해서 올릴 수 있는 레벨 수와 총 비용
@@ -290,8 +291,8 @@ export const bumpDaily = (g, field, amount = 1) => {
   const daily = dailyOf(g.daily);
   return { ...g, daily: { ...daily, [field]: (daily[field] || 0) + amount } };
 };
-export const questRewardOf = (g) => Math.max(1000, incomeOf(g) * 600);
-export const attendanceRewardOf = (g, day) => Math.max(500 * day, incomeOf(g) * 400 * day);
+export const questRewardOf = (g) => Math.max(1000, incomeOf(g) * 300);
+export const attendanceRewardOf = (g, day) => Math.max(500 * day, incomeOf(g) * 200 * day);
 export const nextStreakOf = (attendance) => (attendance.last === yesterdayKey() ? (attendance.streak % 7) + 1 : 1);
 
 // ---------- 저장 데이터 정리 ----------
