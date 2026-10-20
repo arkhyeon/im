@@ -51,6 +51,8 @@ export const savePlayer = (uid, data) =>
     totalEarned: data.totalEarned,
     clickLevel: data.clickLevel,
     owned: data.owned,
+    workers: data.workers,
+    pulls: data.pulls,
     savedAt: data.savedAt,
     updatedAt: serverTimestamp(),
   });

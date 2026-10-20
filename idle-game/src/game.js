@@ -62,6 +62,37 @@ export const MINES = [
   },
 ];
 
+// 고용소에서 뽑는 일꾼 등급
+export const RARITIES = [
+  { name: "일반", color: "#b0bec5" },
+  { name: "희귀", color: "#4fc3f7" },
+  { name: "영웅", color: "#b388ff" },
+  { name: "전설", color: "#ffd54a" },
+  { name: "신화", color: "#ff5c8a" },
+];
+
+// 뽑은 일꾼은 마리당 rate 만큼 초당 골드를 자동으로 캐 와요
+export const WORKERS = [
+  { id: "apprentice", name: "견습 광부", rarity: 0, rate: 1, look: { body: "#8d6e63", helmet: "#ffc107" } },
+  { id: "porter", name: "짐꾼", rarity: 0, rate: 1.5, look: { body: "#689f38", helmet: "#a1887f" } },
+  { id: "veteran", name: "숙련 광부", rarity: 1, rate: 12, look: { body: "#1e88e5", helmet: "#4fc3f7" } },
+  { id: "blaster", name: "폭파 전문가", rarity: 1, rate: 18, look: { body: "#e53935", helmet: "#ff7043", extra: "dynamite" } },
+  { id: "dwarf", name: "드워프 장인", rarity: 2, rate: 200, look: { body: "#6d4c41", helmet: "#b388ff", extra: "beard" } },
+  { id: "wizard", name: "광산 마법사", rarity: 2, rate: 300, look: { body: "#5e35b1", helmet: "#7e57c2", extra: "wizard" } },
+  { id: "golem", name: "황금 골렘", rarity: 3, rate: 4000, look: { body: "#f9a825", helmet: "#ffd54a", skin: "#ffca28", extra: "golem" } },
+  { id: "dragonslayer", name: "용 사냥꾼", rarity: 3, rate: 6000, look: { body: "#b71c1c", helmet: "#ffd54a", extra: "crown" } },
+  { id: "spirit", name: "대지의 정령", rarity: 4, rate: 120000, look: { body: "#26c6da", helmet: "#ff5c8a", skin: "#b2fbff", extra: "spirit" } },
+];
+
+// 비싼 티켓일수록 높은 등급이 잘 나와요. odds는 등급별 확률(%)이고, 뽑을 때마다 그 티켓 가격이 6%씩 올라요.
+export const TICKETS = [
+  { id: "bronze", name: "동 티켓", cost: 100, color: "#e0975a", odds: [80, 19, 1, 0, 0] },
+  { id: "silver", name: "은 티켓", cost: 2000, color: "#dfe7ee", odds: [50, 35, 13, 2, 0] },
+  { id: "gold", name: "금 티켓", cost: 40000, color: "#ffd54a", odds: [20, 40, 30, 9, 1] },
+  { id: "diamond", name: "다이아 티켓", cost: 800000, color: "#7ef9ff", odds: [0, 10, 45, 35, 10] },
+];
+export const TICKET_GROWTH = 1.06;
+
 // 골드 러시: 빠르게 탭해서 게이지를 채우면 발동
 export const RUSH = { perTap: 0.05, decay: 0.12, duration: 10, tapMult: 5, rateMult: 3 };
 
@@ -74,6 +105,8 @@ export const INITIAL = {
   totalEarned: 0,
   clickLevel: 0,
   owned: Object.fromEntries(GENERATORS.map((g) => [g.id, 0])),
+  workers: {},
+  pulls: {},
 };
 
 const indexByMin = (list, value) => list.reduce((found, item, i) => (value >= item.min ? i : found), 0);
@@ -86,8 +119,31 @@ export const costOf = (gen, count) => Math.floor(gen.baseCost * COST_GROWTH ** c
 export const clickCostOf = (level) => Math.floor(50 * 3 ** level);
 export const clickPowerOf = (level) => (level + 1) * 2 ** pickaxeOf(level);
 export const genRateOf = (gen, count) => gen.rate * count * 2 ** tierOf(count);
-export const rateOf = (owned) =>
-  GENERATORS.reduce((sum, g) => sum + genRateOf(g, owned?.[g.id] || 0), 0);
+export const workerRateOf = (workers) =>
+  WORKERS.reduce((sum, w) => sum + w.rate * (workers?.[w.id] || 0), 0);
+export const rateOf = (owned, workers) =>
+  GENERATORS.reduce((sum, g) => sum + genRateOf(g, owned?.[g.id] || 0), 0) + workerRateOf(workers);
+
+// times 번 뽑을 때의 총 가격 (한 번 뽑을 때마다 가격 상승)
+export const ticketCostOf = (ticket, pulls, times = 1) => {
+  let total = 0;
+  for (let k = 0; k < times; k++) total += Math.floor(ticket.cost * TICKET_GROWTH ** (pulls + k));
+  return total;
+};
+
+export const rollWorker = (ticket, rand = Math.random) => {
+  let roll = rand() * 100;
+  let rarity = ticket.odds.reduce((last, odd, i) => (odd > 0 ? i : last), 0);
+  for (let i = 0; i < ticket.odds.length; i++) {
+    if (roll < ticket.odds[i]) {
+      rarity = i;
+      break;
+    }
+    roll -= ticket.odds[i];
+  }
+  const pool = WORKERS.filter((w) => w.rarity === rarity);
+  return pool[Math.floor(rand() * pool.length)];
+};
 
 export const fmt = (n, decimals = 0) => {
   const units = ["", "K", "M", "B", "T", "Qa", "Qi"];
@@ -102,13 +158,17 @@ export const fmt = (n, decimals = 0) => {
 
 // 저장된 데이터(로컬/서버)를 게임 상태로 정리
 export const normalize = (saved) => {
-  if (!saved) return { ...INITIAL, owned: { ...INITIAL.owned } };
+  if (!saved) return { ...INITIAL, owned: { ...INITIAL.owned }, workers: {}, pulls: {} };
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const counts = (obj, list) =>
+    Object.fromEntries(list.map((item) => [item.id, Math.floor(num(obj?.[item.id]))]).filter(([, n]) => n > 0));
   return {
     nickname: typeof saved.nickname === "string" ? saved.nickname : "",
     gold: num(saved.gold),
     totalEarned: Math.max(num(saved.totalEarned), num(saved.gold)),
     clickLevel: Math.floor(num(saved.clickLevel)),
     owned: Object.fromEntries(GENERATORS.map((g) => [g.id, Math.floor(num(saved.owned?.[g.id]))])),
+    workers: counts(saved.workers, WORKERS),
+    pulls: counts(saved.pulls, TICKETS),
   };
 };

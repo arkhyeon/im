@@ -1,4 +1,4 @@
-import { PICKAXES, TIERS, pickaxeOf } from "./game";
+import { PICKAXES, RARITIES, TIERS, pickaxeOf } from "./game";
 
 /* 모든 그림은 이미지 파일 없이 SVG로 그려요. tier가 오를수록 색과 장식이 바뀌어요. */
 
@@ -209,8 +209,72 @@ export function GoogleLogo() {
   );
 }
 
-// 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 꼬마 광부
-export function Walker({ index, tier }) {
+// 고용소 일꾼: look(색, 장식)과 등급에 따라 모습이 달라져요
+export function WorkerIcon({ look, rarity = 0, size = 44, delay = 0 }) {
+  const skin = look.skin || "#f2c9a0";
+  const accent = RARITIES[rarity].color;
+  return (
+    <svg
+      viewBox="0 0 60 60"
+      width={size}
+      height={size}
+      className={look.extra === "spirit" ? "spirit-glow" : ""}
+      aria-hidden="true"
+    >
+      <g className="bob" style={{ animationDelay: `${delay}s` }}>
+        <g className="swing" style={{ transformOrigin: "40px 38px", animationDelay: `${delay}s` }}>
+          <rect x="38.5" y="12" width="3" height="28" rx="1.5" fill={rarity >= 3 ? "#4a148c" : "#8b5a2b"} />
+          <path d="M28 15 Q40 6 52 15 L50 18 Q40 11 30 18 Z" fill={rarity ? accent : "#b0bec5"} />
+        </g>
+        <rect x="21" y="48" width="6" height="8" rx="2" fill="#4e342e" />
+        <rect x="31" y="48" width="6" height="8" rx="2" fill="#4e342e" />
+        <rect x="18" y="32" width="22" height="19" rx="6" fill={look.body} />
+        <rect x="26" y="32" width="6" height="19" fill="rgba(0,0,0,.18)" />
+        {look.extra === "dynamite" && (
+          <>
+            <rect x="19" y="41" width="3" height="8" rx="1" fill="#d32f2f" />
+            <rect x="23" y="41" width="3" height="8" rx="1" fill="#d32f2f" />
+            <path d="M20.5 41 Q20 38 22 37" stroke="#ffb300" strokeWidth="1" fill="none" />
+          </>
+        )}
+        {look.extra === "golem" ? (
+          <rect x="19" y="15" width="20" height="19" rx="4" fill={skin} />
+        ) : (
+          <circle cx="29" cy="25" r="10" fill={skin} />
+        )}
+        <circle cx="25" cy="26" r="1.4" fill={look.extra === "golem" ? "#fff59d" : "#333"} />
+        <circle cx="33" cy="26" r="1.4" fill={look.extra === "golem" ? "#fff59d" : "#333"} />
+        {look.extra === "beard" ? (
+          <path d="M20 26 Q29 42 38 26 Q34 31 29 31 Q24 31 20 26 Z" fill="#cfd8dc" />
+        ) : (
+          <path d="M26 30 Q29 32 32 30" stroke="#a0522d" strokeWidth="1.4" fill="none" />
+        )}
+        {look.extra === "wizard" ? (
+          <>
+            <path d="M17 21 L29 0 L41 21 Z" fill={look.helmet} />
+            <rect x="15" y="19" width="28" height="3" rx="1.5" fill="rgba(0,0,0,.25)" />
+            <Sparkle x={29} y={10} size={0.4} delay={delay} color="#fff59d" />
+          </>
+        ) : (
+          <>
+            <path d="M18 23 A11 11 0 0 1 40 23 Z" fill={look.helmet} />
+            <rect x="16" y="22" width="26" height="3" rx="1.5" fill="rgba(0,0,0,.2)" />
+            <circle cx="29" cy="16" r="2.6" fill="#fff59d" />
+          </>
+        )}
+        {look.extra === "crown" && <path d="M21 13 L24 6 L29 11 L34 6 L37 13 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />}
+        {look.extra === "spirit" && <path d="M22 10 L25 4 L29 8 L33 4 L36 10 Z" fill={accent} />}
+        {rarity >= 3 && <Sparkle x={44} y={8} size={0.5} delay={delay + 0.4} color={accent} />}
+      </g>
+    </svg>
+  );
+}
+
+const MINER_LOOKS = TIERS.map((_, tier) => ({ body: BODY_COLORS[tier], helmet: HELMET_COLORS[tier] }));
+export const minerLook = (tier) => MINER_LOOKS[tier];
+
+// 광석까지 걸어가서 캐고, 광석 자루를 메고 돌아가는 꼬마 일꾼
+export function Walker({ index, look, rarity = 0 }) {
   const fromLeft = index % 2 === 0;
   const lane = Math.floor(index / 2);
   const timing = {
@@ -230,7 +294,7 @@ export function Walker({ index, tier }) {
       }}
     >
       <div className="walker-face" style={timing}>
-        <MinerIcon size={34} tier={tier} delay={index * 0.2} />
+        <WorkerIcon size={34} look={look} rarity={rarity} delay={index * 0.2} />
         <span className="ore-sack" style={timing} />
       </div>
     </div>

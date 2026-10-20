@@ -584,6 +584,237 @@ input:focus-visible {
   cursor: pointer;
 }
 
+/* ---------- 탭 · 고용소 · 내 일꾼 ---------- */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 4px;
+  border-radius: 14px;
+  background: #1a1228;
+  border: 2px solid var(--line);
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-dim);
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab.active {
+  background: var(--panel);
+  color: var(--gold);
+  box-shadow: 0 3px 0 #120c1c;
+}
+
+.section-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ticket {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tc) 22%, var(--panel)), var(--panel-deep));
+  border: 2px solid color-mix(in srgb, var(--tc) 55%, var(--line));
+  box-shadow: 0 4px 0 #120c1c;
+}
+
+.ticket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-stub {
+  width: 30px;
+  height: 20px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg, var(--tc) 0 6px, color-mix(in srgb, var(--tc) 60%, #000) 6px 8px);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tc) 60%, transparent);
+}
+
+.ticket-name {
+  font-size: 19px;
+  color: var(--tc);
+}
+
+.odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.ticket-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.ticket-buttons .buy {
+  flex: 1;
+}
+
+.collection {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.worker-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 18px 4px 10px;
+  border-radius: 16px;
+  text-align: center;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--rc) 25%, var(--panel)), var(--panel-deep));
+  border: 2px solid color-mix(in srgb, var(--rc) 60%, var(--line));
+}
+
+.worker-card.locked {
+  background: var(--panel-deep);
+  border-color: var(--line);
+}
+
+.worker-card.locked svg {
+  filter: brightness(0) opacity(0.45);
+}
+
+.rarity-tag {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  color: var(--rc);
+}
+
+.worker-name {
+  font-size: 14px;
+}
+
+.worker-rate {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.spirit-glow {
+  filter: drop-shadow(0 0 6px #ff5c8a) drop-shadow(0 0 10px #26c6da);
+}
+
+/* ---------- 뽑기 결과 ---------- */
+
+.pull-modal {
+  width: 340px;
+  border-color: var(--bc);
+}
+
+.pull-modal.jackpot {
+  box-shadow: 0 0 40px color-mix(in srgb, var(--bc) 70%, transparent);
+  animation: pop-in 0.4s cubic-bezier(0.3, 1.6, 0.5, 1), shake 0.5s 0.4s;
+}
+
+.pull-modal.jackpot h2 {
+  color: var(--bc);
+  font-size: 24px;
+}
+
+.pull-grid {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.pull-grid.multi {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pull-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 2px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--rc) 35%, #241a35), #1a1228);
+  border: 2px solid var(--rc);
+  opacity: 0;
+  animation: card-in 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards;
+}
+
+.pull-grid:not(.multi) .pull-card {
+  padding: 16px 28px;
+}
+
+.pull-card.r3,
+.pull-card.r4 {
+  box-shadow: 0 0 14px var(--rc);
+}
+
+.pull-card.r4 {
+  background: radial-gradient(circle at 50% 30%, #ff5c8a, #26c6da 70%, #1a1228);
+}
+
+.pull-name {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.pull-grid:not(.multi) .pull-name {
+  font-size: 18px;
+}
+
+.pull-rarity {
+  font-size: 10px;
+  color: var(--rc);
+}
+
+.pull-grid:not(.multi) .pull-rarity {
+  font-size: 14px;
+}
+
+.new-tag {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  background: #ff5252;
+  color: #fff;
+}
+
+@keyframes card-in {
+  0% { opacity: 0; transform: rotateY(90deg) scale(0.6); }
+  100% { opacity: 1; transform: rotateY(0) scale(1); }
+}
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 2px); }
+  40% { transform: translate(6px, -2px); }
+  60% { transform: translate(-4px, 1px); }
+  80% { transform: translate(4px, -1px); }
+}
+
 /* ---------- 알림 배너 ---------- */
 
 .banner {

@@ -12,7 +12,9 @@ service cloud.firestore {
         && request.resource.data.gold is number
         && request.resource.data.totalEarned is number
         && request.resource.data.clickLevel is int
-        && request.resource.data.owned is map;
+        && request.resource.data.owned is map
+        && request.resource.data.workers is map
+        && request.resource.data.pulls is map;
     }
   }
 }
