@@ -44,16 +44,10 @@ export const loadPlayer = async (uid) => {
   return snap.exists() ? snap.data() : null;
 };
 
+// Firestore는 undefined/null 필드를 싫어해서 저장 전에 빈 값을 정리
 export const savePlayer = (uid, data) =>
   setDoc(doc(db, "players", uid), {
-    nickname: data.nickname,
-    gold: data.gold,
-    totalEarned: data.totalEarned,
-    clickLevel: data.clickLevel,
-    owned: data.owned,
-    workers: data.workers,
-    pulls: data.pulls,
-    savedAt: data.savedAt,
+    ...JSON.parse(JSON.stringify({ ...data, daily: data.daily ?? {} })),
     updatedAt: serverTimestamp(),
   });
 

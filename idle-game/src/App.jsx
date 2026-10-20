@@ -1,31 +1,48 @@
 import { useEffect, useRef, useState } from "react";
 import { firebaseEnabled, loadPlayer, login, logout, savePlayer, watchAuth, watchTop3 } from "./firebase";
 import {
+  AD_TICKET,
+  BAT,
   GENERATORS,
-  INITIAL,
   MAX_OFFLINE_SEC,
+  MERGE_COUNT,
   MINES,
   PICKAXES,
+  PITY,
+  PRESTIGE_UNIT,
+  QUESTS,
   RARITIES,
   RUSH,
   TICKETS,
   TIERS,
   WORKERS,
+  addGold,
+  attendanceRewardOf,
+  bumpDaily,
   clickCostOf,
   clickPowerOf,
   costOf,
+  dailyOf,
   fmt,
   genRateOf,
+  incomeOf,
   mineOf,
+  nextStreakOf,
   normalize,
+  pickWorker,
   pickaxeOf,
-  rateOf,
+  prestigeMult,
+  questRewardOf,
   rollWorker,
+  stonesFor,
+  tapPowerOf,
   ticketCostOf,
   tierOf,
+  todayKey,
   workerRateOf,
 } from "./game";
 import {
+  BatIcon,
   ChestIcon,
   CoinIcon,
   GeneratorIcon,
@@ -41,6 +58,7 @@ import {
 const MACHINE_LIMITS = { drill: 3, factory: 2, bank: 2 };
 const MAX_WALKERS = 8;
 const MEDALS = ["🥇", "🥈", "🥉"];
+const AD_MS = 2000;
 
 // 동굴 배경에 떠다니는 먼지, 골드 러시 때 쏟아지는 코인 위치
 const DUST = Array.from({ length: 12 }, (_, i) => ({
@@ -138,14 +156,16 @@ function Game({ user, onExit }) {
   const [askNickname, setAskNickname] = useState(false);
   const [top3, setTop3] = useState([]);
   const [rush, setRush] = useState({ gauge: 0, until: 0 });
-  const [watchingAd, setWatchingAd] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(null);
   const [fx, setFx] = useState([]);
   const [hit, setHit] = useState(0);
   const [popKey, setPopKey] = useState({});
   const [banner, setBanner] = useState(null);
   const [armReset, setArmReset] = useState(false);
+  const [armPrestige, setArmPrestige] = useState(false);
   const [tab, setTab] = useState("hire");
   const [pullResult, setPullResult] = useState(null);
+  const [bat, setBat] = useState(null);
 
   const gameRef = useRef(game);
   gameRef.current = game;
@@ -178,7 +198,7 @@ function Game({ user, onExit }) {
         setAskNickname(true);
       }
       setGame(state);
-      if (saved?.savedAt) setOffline(rateOf(state.owned, state.workers) * offlineSecSince(saved.savedAt));
+      if (saved?.savedAt) setOffline(incomeOf(state) * offlineSecSince(saved.savedAt));
       setLoaded(true);
     })();
     return () => {
@@ -197,8 +217,8 @@ function Game({ user, onExit }) {
       last = now;
       const rushing = rushRef.current.until > now;
       setGame((g) => {
-        const gain = rateOf(g.owned, g.workers) * (rushing ? RUSH.rateMult : 1) * dt;
-        return gain ? { ...g, gold: g.gold + gain, totalEarned: g.totalEarned + gain } : g;
+        const gain = incomeOf(g) * (rushing ? RUSH.rateMult : 1) * dt;
+        return gain ? addGold(g, gain) : g;
       });
       setRush((r) => {
         if (r.until) return r.until <= now ? { gauge: 0, until: 0 } : r;
@@ -223,7 +243,7 @@ function Game({ user, onExit }) {
         saveLocal();
         saveRemote();
       } else if (hiddenAt) {
-        const reward = rateOf(gameRef.current.owned, gameRef.current.workers) * offlineSecSince(hiddenAt);
+        const reward = incomeOf(gameRef.current) * offlineSecSince(hiddenAt);
         hiddenAt = null;
         if (reward >= 1) setOffline((o) => o + reward);
       }
@@ -241,14 +261,30 @@ function Game({ user, onExit }) {
     };
   }, [loaded, uid]);
 
+  // 황금 박쥐가 가끔 화면을 가로질러 날아감
+  useEffect(() => {
+    let timer;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        setBat({ id: Date.now(), top: 12 + Math.random() * 30, fromLeft: Math.random() < 0.5 });
+        timer = setTimeout(() => {
+          setBat(null);
+          schedule();
+        }, BAT.flight);
+      }, BAT.minGap + Math.random() * (BAT.maxGap - BAT.minGap));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
+
   const showBanner = (title, sub, color = "#ffd54a") => {
     const id = Date.now() + Math.random();
     setBanner({ id, title, sub, color });
     setTimeout(() => setBanner((b) => (b?.id === id ? null : b)), 2400);
   };
 
-  // 누적 채굴량이 늘어 새 광산으로 바뀌면 알림
-  const mineIndex = mineOf(game.totalEarned);
+  // 이번 판 채굴량이 늘어 새 광산으로 바뀌면 알림
+  const mineIndex = mineOf(game.runEarned);
   const mine = MINES[mineIndex];
   useEffect(() => {
     if (!loaded) return;
@@ -261,11 +297,15 @@ function Game({ user, onExit }) {
   const now = Date.now();
   const rushing = rush.until > now;
   const rushLeft = rushing ? (rush.until - now) / 1000 : 0;
-  const clickPower = clickPowerOf(game.clickLevel);
-  const rate = rateOf(game.owned, game.workers) * (rushing ? RUSH.rateMult : 1);
+  const tapPower = tapPowerOf(game);
+  const income = incomeOf(game);
+  const rate = income * (rushing ? RUSH.rateMult : 1);
+  const daily = dailyOf(game.daily);
+  const attendanceDue = loaded && game.attendance.last !== todayKey();
+  const questReady = QUESTS.some((q, i) => daily[q.id] >= q.goal && !daily.claimed[i]);
 
-  const spawnFx = (x, y, amount, big) => {
-    const items = [{ id: ++fxId.current, type: "text", x, y, text: `+${fmt(amount)}`, big }];
+  const spawnFx = (x, y, text, big) => {
+    const items = [{ id: ++fxId.current, type: "text", x, y, text, big }];
     for (let i = 0; i < (big ? 9 : 6); i++) {
       const angle = Math.random() * Math.PI * 2;
       const dist = 40 + Math.random() * (big ? 80 : 50);
@@ -283,22 +323,38 @@ function Game({ user, onExit }) {
     setTimeout(() => setFx((f) => f.filter((item) => !ids.has(item.id))), 900);
   };
 
+  const startRush = () => {
+    showBanner("골드 러시!", `${RUSH.duration}초 동안 탭 x${RUSH.tapMult} · 생산 x${RUSH.rateMult}`);
+    setRush({ gauge: 1, until: Date.now() + RUSH.duration * 1000 });
+    setGame((g) => bumpDaily(g, "rushes"));
+  };
+
   const tap = (e) => {
     const rect = sceneRef.current.getBoundingClientRect();
     const isRushing = rushRef.current.until > Date.now();
-    const gain = clickPower * (isRushing ? RUSH.tapMult : 1);
-    spawnFx(e.clientX - rect.left, e.clientY - rect.top, gain, isRushing);
+    const gain = tapPower * (isRushing ? RUSH.tapMult : 1);
+    spawnFx(e.clientX - rect.left, e.clientY - rect.top, `+${fmt(gain)}`, isRushing);
     setHit((h) => h + 1);
-    setGame((g) => ({ ...g, gold: g.gold + gain, totalEarned: g.totalEarned + gain }));
+    setGame((g) => bumpDaily(addGold(g, gain), "taps"));
     if (isRushing) return;
-    if (rushRef.current.gauge + RUSH.perTap >= 1) {
-      showBanner("골드 러시!", `${RUSH.duration}초 동안 탭 x${RUSH.tapMult} · 생산 x${RUSH.rateMult}`);
+    const gauge = rushRef.current.gauge + RUSH.perTap;
+    if (gauge >= 1) startRush();
+    else setRush({ gauge, until: 0 });
+  };
+
+  const catchBat = (e) => {
+    e.stopPropagation();
+    const rect = sceneRef.current.getBoundingClientRect();
+    setBat(null);
+    if (Math.random() < 0.25 && rushRef.current.until <= Date.now()) {
+      showBanner("황금 박쥐 포획!", "골드 러시 발동");
+      startRush();
+      return;
     }
-    setRush((r) => {
-      if (r.until) return r;
-      const gauge = r.gauge + RUSH.perTap;
-      return gauge >= 1 ? { gauge: 1, until: Date.now() + RUSH.duration * 1000 } : { gauge, until: 0 };
-    });
+    const reward = Math.max(500, incomeOf(gameRef.current) * 90);
+    spawnFx(e.clientX - rect.left, e.clientY - rect.top, `+${fmt(reward)}`, true);
+    showBanner("황금 박쥐 포획!", `골드 +${fmt(reward)}`);
+    setGame((g) => addGold(g, reward));
   };
 
   const flash = (id) => setPopKey((p) => ({ ...p, [id]: (p[id] || 0) + 1 }));
@@ -333,19 +389,117 @@ function Game({ user, onExit }) {
     }
   };
 
+  const showResults = (results, title, before) =>
+    setPullResult({
+      id: Date.now(),
+      title,
+      best: Math.max(...results.map((w) => w.rarity)),
+      results: results.map((w, i) => ({
+        ...w,
+        isNew: !before[w.id] && results.findIndex((r) => r.id === w.id) === i,
+      })),
+    });
+
+  // free: 광고·출석 보상처럼 골드를 쓰지 않는 뽑기 (ad면 오늘 광고 횟수도 차감)
+  const pull = (ticket, times, free = null) => {
+    const g0 = gameRef.current;
+    const cost = free ? 0 : ticketCostOf(ticket, g0.pulls[ticket.id] || 0, times);
+    if (g0.gold < cost) return;
+    let pity = g0.pity;
+    const results = Array.from({ length: times }, () => {
+      let w = rollWorker(ticket);
+      if (ticket.id === PITY.ticket) {
+        pity += 1;
+        if (w.rarity < 3 && pity >= PITY.limit) w = pickWorker(3);
+        if (w.rarity >= 3) pity = 0;
+      }
+      return w;
+    });
+    setGame((g) => {
+      if (g.gold < cost) return g;
+      const workers = { ...g.workers };
+      results.forEach((w) => {
+        workers[w.id] = (workers[w.id] || 0) + 1;
+      });
+      let next = { ...g, gold: g.gold - cost, workers, pity };
+      if (!free) next.pulls = { ...g.pulls, [ticket.id]: (g.pulls[ticket.id] || 0) + times };
+      next = bumpDaily(next, "pulls", times);
+      if (free === "ad") next = bumpDaily(next, "ads");
+      return next;
+    });
+    showResults(results, `${ticket.name} 결과`, g0.workers);
+  };
+
+  const merge = (worker) => {
+    const g0 = gameRef.current;
+    if ((g0.workers[worker.id] || 0) < MERGE_COUNT || worker.rarity >= RARITIES.length - 1) return;
+    const result = pickWorker(worker.rarity + 1);
+    setGame((g) => {
+      if ((g.workers[worker.id] || 0) < MERGE_COUNT) return g;
+      const workers = { ...g.workers, [worker.id]: g.workers[worker.id] - MERGE_COUNT };
+      workers[result.id] = (workers[result.id] || 0) + 1;
+      if (!workers[worker.id]) delete workers[worker.id];
+      return { ...g, workers };
+    });
+    showResults([result], "합성 성공!", g0.workers);
+  };
+
+  // TODO: 스토어 출시 시 AdMob 보상형 광고로 교체 (광고 완료 콜백에서 onDone 실행)
+  const playAd = (kind, onDone) => {
+    setWatchingAd(kind);
+    setTimeout(() => {
+      setWatchingAd(null);
+      onDone();
+    }, AD_MS);
+  };
+
   const claimOffline = (multiplier) => {
     const reward = offline * multiplier;
-    setGame((g) => ({ ...g, gold: g.gold + reward, totalEarned: g.totalEarned + reward }));
+    setGame((g) => addGold(g, reward));
     setOffline(0);
   };
 
-  // TODO: 스토어 출시 시 AdMob 보상형 광고로 교체 (광고 완료 콜백에서 claimOffline(2))
-  const watchAd = () => {
-    setWatchingAd(true);
-    setTimeout(() => {
-      setWatchingAd(false);
-      claimOffline(2);
-    }, 2000);
+  const claimAttendance = () => {
+    const g0 = gameRef.current;
+    const day = nextStreakOf(g0.attendance);
+    const reward = attendanceRewardOf(g0, day);
+    setGame((g) => addGold({ ...g, attendance: { last: todayKey(), streak: day } }, reward));
+    showBanner(`출석 ${day}일차`, `골드 +${fmt(reward)}${day === 7 ? " · 금 티켓 1회" : ""}`);
+    if (day === 7) pull(TICKETS.find((t) => t.id === "gold"), 1, "attendance");
+  };
+
+  const claimQuest = (index) => {
+    const reward = questRewardOf(gameRef.current);
+    setGame((g) => {
+      const d = dailyOf(g.daily);
+      if (d.claimed[index] || d[QUESTS[index].id] < QUESTS[index].goal) return g;
+      const claimed = d.claimed.map((c, i) => c || i === index);
+      return addGold({ ...g, daily: { ...d, claimed } }, reward);
+    });
+    showBanner("미션 완료!", `골드 +${fmt(reward)}`);
+  };
+
+  const rebirth = () => {
+    const gain = stonesFor(gameRef.current.runEarned);
+    if (gain < 1) return;
+    if (!armPrestige) {
+      setArmPrestige(true);
+      setTimeout(() => setArmPrestige(false), 3000);
+      return;
+    }
+    setArmPrestige(false);
+    setGame((g) => ({
+      ...normalize(null),
+      nickname: g.nickname,
+      totalEarned: g.totalEarned,
+      stones: g.stones + gain,
+      prestiges: g.prestiges + 1,
+      pity: g.pity,
+      daily: g.daily,
+      attendance: g.attendance,
+    }));
+    setRush({ gauge: 0, until: 0 });
+    showBanner("환생 완료!", `환생석 +${gain} · 생산·탭 x${prestigeMult(gameRef.current.stones + gain).toFixed(1)}`, "#ff9ef5");
   };
 
   const saveNickname = (nickname) => {
@@ -372,31 +526,6 @@ function Game({ user, onExit }) {
     onExit();
   };
 
-  const pull = (ticket, times) => {
-    const pulls = gameRef.current.pulls[ticket.id] || 0;
-    const cost = ticketCostOf(ticket, pulls, times);
-    if (gameRef.current.gold < cost) return;
-    const before = gameRef.current.workers;
-    const results = Array.from({ length: times }, () => rollWorker(ticket));
-    setGame((g) => {
-      if (g.gold < cost) return g;
-      const workers = { ...g.workers };
-      results.forEach((w) => {
-        workers[w.id] = (workers[w.id] || 0) + 1;
-      });
-      return { ...g, gold: g.gold - cost, workers, pulls: { ...g.pulls, [ticket.id]: (g.pulls[ticket.id] || 0) + times } };
-    });
-    setPullResult({
-      id: Date.now(),
-      ticket,
-      best: Math.max(...results.map((w) => w.rarity)),
-      results: results.map((w, i) => ({
-        ...w,
-        isNew: !before[w.id] && results.findIndex((r) => r.id === w.id) === i,
-      })),
-    });
-  };
-
   const resetGame = () => {
     if (!armReset) {
       setArmReset(true);
@@ -417,8 +546,6 @@ function Game({ user, onExit }) {
     rarity: 0,
   }));
   const walkers = [...workerWalkers, ...minerWalkers].slice(0, MAX_WALKERS);
-  const workerRate = workerRateOf(game.workers);
-  const collected = WORKERS.filter((w) => game.workers[w.id]).length;
   const machines = GENERATORS.filter((g) => MACHINE_LIMITS[g.id]).flatMap((g) =>
     Array.from({ length: Math.min(game.owned[g.id], MACHINE_LIMITS[g.id]) }, (_, i) => ({
       key: `${g.id}-${i}`,
@@ -426,6 +553,10 @@ function Game({ user, onExit }) {
       delay: i * 0.4,
     }))
   );
+  const collected = WORKERS.filter((w) => game.workers[w.id]).length;
+  const adTicket = TICKETS.find((t) => t.id === AD_TICKET.ticket);
+  const adsLeft = AD_TICKET.perDay - daily.ads;
+  const stoneGain = stonesFor(game.runEarned);
 
   if (!loaded) return <div className="splash">광산 여는 중...</div>;
 
@@ -467,6 +598,11 @@ function Game({ user, onExit }) {
                 </button>
               </>
             )}
+            {game.stones > 0 && (
+              <span className="stone-chip">
+                💎 {game.stones} · x{prestigeMult(game.stones).toFixed(1)}
+              </span>
+            )}
           </div>
         </div>
         <div className="gold-row">
@@ -503,7 +639,7 @@ function Game({ user, onExit }) {
               <CoinIcon size={16} />
             </span>
           ))}
-        {game.totalEarned < 10 && <div className="hint">광석을 톡톡 캐 보세요!</div>}
+        {game.runEarned < 10 && <div className="hint">광석을 톡톡 캐 보세요!</div>}
         <div key={hit} className={`rock-wrap ${hit ? "hit" : ""}`}>
           <OreRock mine={mine} />
         </div>
@@ -515,6 +651,19 @@ function Game({ user, onExit }) {
         {walkers.map((w, i) => (
           <Walker key={i} index={i} look={w.look} rarity={w.rarity} />
         ))}
+        {bat && (
+          <button
+            key={bat.id}
+            className={`bat ${bat.fromLeft ? "" : "reverse"}`}
+            style={{ top: `${bat.top}%`, animationDuration: `${BAT.flight}ms` }}
+            onPointerDown={catchBat}
+            aria-label="황금 박쥐 잡기"
+          >
+            <span className="bat-bob">
+              <BatIcon />
+            </span>
+          </button>
+        )}
         {fx.map((item) =>
           item.type === "text" ? (
             <span
@@ -538,12 +687,14 @@ function Game({ user, onExit }) {
 
       <nav className="tabs" aria-label="메뉴">
         {[
-          ["hire", "고용소"],
-          ["workers", `내 일꾼 ${collected}/${WORKERS.length}`],
-          ["upgrade", "업그레이드"],
-        ].map(([id, label]) => (
+          ["hire", "고용소", adsLeft > 0],
+          ["workers", `일꾼 ${collected}/${WORKERS.length}`, WORKERS.some((w) => w.rarity < 4 && (game.workers[w.id] || 0) >= MERGE_COUNT)],
+          ["upgrade", "강화", stoneGain > 0],
+          ["missions", "미션", questReady],
+        ].map(([id, label, dot]) => (
           <button key={id} className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
             {label}
+            {dot && <span className="dot" />}
           </button>
         ))}
       </nav>
@@ -551,6 +702,20 @@ function Game({ user, onExit }) {
       {tab === "hire" && (
         <div className="shop">
           <p className="section-note">티켓으로 일꾼을 뽑으면 탭하지 않아도 초당 골드를 캐 와요. 비싼 티켓일수록 높은 등급이 잘 나와요.</p>
+          <button
+            className="ad-wide"
+            disabled={adsLeft <= 0 || Boolean(watchingAd)}
+            onClick={() => playAd("ticket", () => pull(adTicket, 1, "ad"))}
+          >
+            {watchingAd === "ticket" && <span className="ad-progress" />}
+            <span className="ad-label">
+              {watchingAd === "ticket"
+                ? "광고 시청 중..."
+                : adsLeft > 0
+                  ? `📺 광고 보고 무료 ${adTicket.name} (오늘 ${adsLeft}/${AD_TICKET.perDay})`
+                  : "오늘 무료 티켓을 다 받았어요"}
+            </span>
+          </button>
           {TICKETS.map((ticket) => {
             const pulls = game.pulls[ticket.id] || 0;
             const cost1 = ticketCostOf(ticket, pulls, 1);
@@ -560,6 +725,9 @@ function Game({ user, onExit }) {
                 <div className="ticket-head">
                   <span className="ticket-stub" />
                   <span className="ticket-name">{ticket.name}</span>
+                  {ticket.id === PITY.ticket && (
+                    <span className="pity">전설 보장까지 {PITY.limit - game.pity}회</span>
+                  )}
                 </div>
                 <div className="odds">
                   {ticket.odds.map((odd, r) =>
@@ -589,11 +757,12 @@ function Game({ user, onExit }) {
       {tab === "workers" && (
         <div className="shop">
           <p className="section-note">
-            고용소 일꾼이 초당 +{fmt(workerRate, 1)} 캐고 있어요 · 도감 {collected}/{WORKERS.length}
+            고용소 일꾼이 초당 +{fmt(workerRateOf(game.workers) * prestigeMult(game.stones), 1)} 캐고 있어요. 같은 일꾼 {MERGE_COUNT}마리를 합치면 한 등급 위 일꾼이 나와요.
           </p>
           <div className="collection">
             {WORKERS.map((w) => {
               const count = game.workers[w.id] || 0;
+              const canMerge = count >= MERGE_COUNT && w.rarity < RARITIES.length - 1;
               return (
                 <div
                   key={w.id}
@@ -603,7 +772,14 @@ function Game({ user, onExit }) {
                   <span className="rarity-tag">{RARITIES[w.rarity].name}</span>
                   <WorkerIcon look={w.look} rarity={w.rarity} size={52} />
                   <span className="worker-name">{count ? w.name : "???"}</span>
-                  <span className="worker-rate">{count ? `x${count} · 초당 +${fmt(w.rate * count, 1)}` : `마리당 +${fmt(w.rate, 1)}`}</span>
+                  <span className="worker-rate">
+                    {count ? `x${count} · 초당 +${fmt(w.rate * count, 1)}` : `마리당 +${fmt(w.rate, 1)}`}
+                  </span>
+                  {canMerge && (
+                    <button className="merge-btn" onClick={() => merge(w)}>
+                      합성 {MERGE_COUNT}→1
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -612,75 +788,116 @@ function Game({ user, onExit }) {
       )}
 
       {tab === "upgrade" && (
-      <div className="shop">
-        <ShopCard
-          popKey={popKey.click}
-          icon={<PickaxeIcon size={48} level={game.clickLevel} />}
-          tier={Math.min(pickaxeOf(game.clickLevel), TIERS.length - 1)}
-          name={PICKAXES[pickaxeOf(game.clickLevel)].name}
-          badge={`Lv.${game.clickLevel}`}
-          desc={`탭당 +${fmt(clickPower)} → +${fmt(clickPowerOf(game.clickLevel + 1))}`}
-          cost={clickCostOf(game.clickLevel)}
-          canBuy={game.gold >= clickCostOf(game.clickLevel)}
-          onBuy={buyClick}
-        />
-        {GENERATORS.map((gen) => {
-          const count = game.owned[gen.id];
-          const tier = tierOf(count);
-          const next = TIERS[tier + 1];
-          const cost = costOf(gen, count);
-          return (
-            <ShopCard
-              key={gen.id}
-              popKey={popKey[gen.id]}
-              icon={<GeneratorIcon id={gen.id} size={48} tier={tier} />}
-              tier={tier}
-              name={`${gen.name} · ${TIERS[tier].name}`}
-              badge={`x${count}`}
-              desc={
-                `초당 +${fmt(genRateOf(gen, count), 1)}` +
-                (next ? ` · ${next.name}까지 ${next.min - count}개` : " · 최고 티어")
-              }
-              cycle={count > 0 ? gen.cycle : 0}
-              cost={cost}
-              canBuy={game.gold >= cost}
-              onBuy={() => buyGenerator(gen)}
-            />
-          );
-        })}
-        <button className="reset" onClick={resetGame}>
-          {armReset ? "한 번 더 누르면 처음부터 시작해요" : "초기화"}
-        </button>
-      </div>
+        <div className="shop">
+          <ShopCard
+            popKey={popKey.click}
+            icon={<PickaxeIcon size={48} level={game.clickLevel} />}
+            tier={Math.min(pickaxeOf(game.clickLevel), TIERS.length - 1)}
+            name={PICKAXES[pickaxeOf(game.clickLevel)].name}
+            badge={`Lv.${game.clickLevel}`}
+            desc={`탭당 +${fmt(clickPowerOf(game.clickLevel))} → +${fmt(clickPowerOf(game.clickLevel + 1))}`}
+            cost={clickCostOf(game.clickLevel)}
+            canBuy={game.gold >= clickCostOf(game.clickLevel)}
+            onBuy={buyClick}
+          />
+          {GENERATORS.map((gen) => {
+            const count = game.owned[gen.id];
+            const tier = tierOf(count);
+            const next = TIERS[tier + 1];
+            const cost = costOf(gen, count);
+            return (
+              <ShopCard
+                key={gen.id}
+                popKey={popKey[gen.id]}
+                icon={<GeneratorIcon id={gen.id} size={48} tier={tier} />}
+                tier={tier}
+                name={`${gen.name} · ${TIERS[tier].name}`}
+                badge={`x${count}`}
+                desc={
+                  `초당 +${fmt(genRateOf(gen, count), 1)}` +
+                  (next ? ` · ${next.name}까지 ${next.min - count}개` : " · 최고 티어")
+                }
+                cycle={count > 0 ? gen.cycle : 0}
+                cost={cost}
+                canBuy={game.gold >= cost}
+                onBuy={() => buyGenerator(gen)}
+              />
+            );
+          })}
+
+          <section className="prestige">
+            <div className="prestige-title">💎 환생</div>
+            <p className="prestige-text">
+              골드·일꾼·강화를 처음부터 다시 하는 대신 환생석을 받아요. 환생석 1개마다 생산과 탭이 영구히 +10%예요.
+            </p>
+            <div className="prestige-stats">
+              <span>보유 {game.stones}개 (x{prestigeMult(game.stones).toFixed(1)})</span>
+              <span>지금 환생하면 +{stoneGain}개</span>
+            </div>
+            <button className="prestige-btn" disabled={stoneGain < 1} onClick={rebirth}>
+              {stoneGain < 1
+                ? `이번 판에서 ${fmt(PRESTIGE_UNIT)} 이상 캐면 환생할 수 있어요`
+                : armPrestige
+                  ? "한 번 더 누르면 환생해요"
+                  : `환생하고 💎 ${stoneGain}개 받기`}
+            </button>
+          </section>
+
+          <button className="reset" onClick={resetGame}>
+            {armReset ? "한 번 더 누르면 처음부터 시작해요 (환생석 포함)" : "초기화"}
+          </button>
+        </div>
       )}
 
-      {pullResult && (
-        <div className="overlay" onClick={() => setPullResult(null)}>
-          <div
-            key={pullResult.id}
-            className={`modal pull-modal ${pullResult.best >= 3 ? "jackpot" : ""}`}
-            style={{ "--bc": RARITIES[pullResult.best].color }}
-          >
-            {pullResult.best >= 3 && <div className="banner-rays" />}
-            <h2>{pullResult.best >= 3 ? `${RARITIES[pullResult.best].name} 일꾼 등장!` : `${pullResult.ticket.name} 결과`}</h2>
-            <div className={`pull-grid ${pullResult.results.length > 1 ? "multi" : ""}`}>
-              {pullResult.results.map((w, i) => (
-                <div
-                  key={i}
-                  className={`pull-card r${w.rarity}`}
-                  style={{ "--rc": RARITIES[w.rarity].color, animationDelay: `${i * 0.12}s` }}
-                >
-                  {w.isNew && <span className="new-tag">NEW</span>}
-                  <WorkerIcon look={w.look} rarity={w.rarity} size={pullResult.results.length > 1 ? 40 : 72} />
-                  <span className="pull-name">{w.name}</span>
-                  <span className="pull-rarity">{RARITIES[w.rarity].name}</span>
-                </div>
-              ))}
+      {tab === "missions" && (
+        <div className="shop">
+          <section className="mission-box">
+            <div className="mission-title">📅 출석</div>
+            <div className="attendance">
+              {Array.from({ length: 7 }, (_, i) => {
+                const day = i + 1;
+                const done = game.attendance.last === todayKey() ? day <= game.attendance.streak : day < nextStreakOf(game.attendance);
+                return (
+                  <div key={day} className={`att-day ${done ? "done" : ""} ${day === 7 ? "big" : ""}`}>
+                    <span>{day}일</span>
+                    <span className="att-icon">{day === 7 ? "🎟️" : "💰"}</span>
+                  </div>
+                );
+              })}
             </div>
-            <button className="ad-btn" onClick={() => setPullResult(null)}>
-              <span className="ad-label">확인</span>
-            </button>
-          </div>
+            <p className="mission-note">
+              {attendanceDue ? "오늘 출석 보상을 아직 안 받았어요" : "오늘 출석 완료! 내일 또 오세요"} · 7일차엔 금 티켓 1회
+            </p>
+          </section>
+
+          <section className="mission-box">
+            <div className="mission-title">🎯 오늘의 미션</div>
+            {QUESTS.map((q, i) => {
+              const progress = Math.min(daily[q.id], q.goal);
+              const done = progress >= q.goal;
+              return (
+                <div key={q.id} className="quest">
+                  <div className="quest-info">
+                    <span>{q.name}</span>
+                    <div className="bar">
+                      <div className="quest-fill" style={{ width: `${(progress / q.goal) * 100}%` }} />
+                    </div>
+                    <span className="quest-count">
+                      {progress}/{q.goal}
+                    </span>
+                  </div>
+                  <button
+                    className={`buy ${done && !daily.claimed[i] ? "ready" : ""}`}
+                    disabled={!done || daily.claimed[i]}
+                    onClick={() => claimQuest(i)}
+                  >
+                    {daily.claimed[i] ? "완료" : `+${fmt(questRewardOf(game))}`}
+                  </button>
+                </div>
+              );
+            })}
+            <p className="mission-note">미션은 매일 자정에 새로 바뀌어요</p>
+          </section>
         </div>
       )}
 
@@ -713,12 +930,70 @@ function Game({ user, onExit }) {
               <CoinIcon size={30} />
               {fmt(offline)}
             </p>
-            <button className="ad-btn" onClick={watchAd} disabled={watchingAd}>
-              {watchingAd && <span className="ad-progress" />}
-              <span className="ad-label">{watchingAd ? "광고 시청 중..." : "📺 광고 보고 2배 받기"}</span>
+            <button className="ad-btn" onClick={() => playAd("offline", () => claimOffline(2))} disabled={Boolean(watchingAd)}>
+              {watchingAd === "offline" && <span className="ad-progress" />}
+              <span className="ad-label">{watchingAd === "offline" ? "광고 시청 중..." : "📺 광고 보고 2배 받기"}</span>
             </button>
-            <button className="plain-btn" onClick={() => claimOffline(1)} disabled={watchingAd}>
+            <button className="plain-btn" onClick={() => claimOffline(1)} disabled={Boolean(watchingAd)}>
               그냥 받기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!askNickname && offline < 1 && !pullResult && attendanceDue && (
+        <div className="overlay">
+          <div className="modal">
+            <div className="rays" />
+            <h2>출석 {nextStreakOf(game.attendance)}일차</h2>
+            <div className="attendance">
+              {Array.from({ length: 7 }, (_, i) => (
+                <div
+                  key={i}
+                  className={`att-day ${i + 1 < nextStreakOf(game.attendance) ? "done" : ""} ${i + 1 === nextStreakOf(game.attendance) ? "today" : ""} ${i === 6 ? "big" : ""}`}
+                >
+                  <span>{i + 1}일</span>
+                  <span className="att-icon">{i === 6 ? "🎟️" : "💰"}</span>
+                </div>
+              ))}
+            </div>
+            <p className="reward">
+              <CoinIcon size={30} />
+              {fmt(attendanceRewardOf(game, nextStreakOf(game.attendance)))}
+            </p>
+            {nextStreakOf(game.attendance) === 7 && <p className="modal-text">+ 금 티켓 1회 무료</p>}
+            <button className="ad-btn" onClick={claimAttendance}>
+              <span className="ad-label">출석 보상 받기</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pullResult && (
+        <div className="overlay" onClick={() => setPullResult(null)}>
+          <div
+            key={pullResult.id}
+            className={`modal pull-modal ${pullResult.best >= 3 ? "jackpot" : ""}`}
+            style={{ "--bc": RARITIES[pullResult.best].color }}
+          >
+            {pullResult.best >= 3 && <div className="banner-rays" />}
+            <h2>{pullResult.best >= 3 ? `${RARITIES[pullResult.best].name} 일꾼 등장!` : pullResult.title}</h2>
+            <div className={`pull-grid ${pullResult.results.length > 1 ? "multi" : ""}`}>
+              {pullResult.results.map((w, i) => (
+                <div
+                  key={i}
+                  className={`pull-card r${w.rarity}`}
+                  style={{ "--rc": RARITIES[w.rarity].color, animationDelay: `${i * 0.12}s` }}
+                >
+                  {w.isNew && <span className="new-tag">NEW</span>}
+                  <WorkerIcon look={w.look} rarity={w.rarity} size={pullResult.results.length > 1 ? 40 : 72} />
+                  <span className="pull-name">{w.name}</span>
+                  <span className="pull-rarity">{RARITIES[w.rarity].name}</span>
+                </div>
+              ))}
+            </div>
+            <button className="ad-btn" onClick={() => setPullResult(null)}>
+              <span className="ad-label">확인</span>
             </button>
           </div>
         </div>

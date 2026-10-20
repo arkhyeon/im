@@ -93,6 +93,23 @@ export const TICKETS = [
 ];
 export const TICKET_GROWTH = 1.06;
 
+// 천장: 금 티켓을 50번 뽑는 동안 전설이 안 나오면 50번째는 전설 이상 확정
+export const PITY = { ticket: "gold", limit: 50 };
+// 같은 일꾼 5마리 → 한 등급 위 일꾼 1마리
+export const MERGE_COUNT = 5;
+// 광고 보고 무료 은 티켓, 하루 3회
+export const AD_TICKET = { ticket: "silver", perDay: 3 };
+// 환생: 이번 판 채굴량 1M마다 계산해 환생석 지급, 환생석 1개당 생산·탭 +10%
+export const PRESTIGE_UNIT = 1e6;
+// 황금 박쥐: 40~90초마다 7초 동안 날아감
+export const BAT = { minGap: 40000, maxGap: 90000, flight: 7000 };
+
+export const QUESTS = [
+  { id: "taps", name: "광석 300번 캐기", goal: 300 },
+  { id: "pulls", name: "일꾼 10명 뽑기", goal: 10 },
+  { id: "rushes", name: "골드 러시 2번 발동", goal: 2 },
+];
+
 // 골드 러시: 빠르게 탭해서 게이지를 채우면 발동
 export const RUSH = { perTap: 0.05, decay: 0.12, duration: 10, tapMult: 5, rateMult: 3 };
 
@@ -107,12 +124,18 @@ export const INITIAL = {
   owned: Object.fromEntries(GENERATORS.map((g) => [g.id, 0])),
   workers: {},
   pulls: {},
+  runEarned: 0,
+  stones: 0,
+  prestiges: 0,
+  pity: 0,
+  daily: null,
+  attendance: { last: "", streak: 0 },
 };
 
 const indexByMin = (list, value) => list.reduce((found, item, i) => (value >= item.min ? i : found), 0);
 
 export const tierOf = (count) => indexByMin(TIERS, count);
-export const mineOf = (totalEarned) => indexByMin(MINES, totalEarned);
+export const mineOf = (runEarned) => indexByMin(MINES, runEarned);
 export const pickaxeOf = (level) => Math.min(Math.floor(level / 3), PICKAXES.length - 1);
 
 export const costOf = (gen, count) => Math.floor(gen.baseCost * COST_GROWTH ** count);
@@ -123,6 +146,35 @@ export const workerRateOf = (workers) =>
   WORKERS.reduce((sum, w) => sum + w.rate * (workers?.[w.id] || 0), 0);
 export const rateOf = (owned, workers) =>
   GENERATORS.reduce((sum, g) => sum + genRateOf(g, owned?.[g.id] || 0), 0) + workerRateOf(workers);
+
+export const prestigeMult = (stones) => 1 + stones * 0.1;
+export const stonesFor = (runEarned) => Math.floor(Math.sqrt(runEarned / PRESTIGE_UNIT));
+// 환생 배율까지 포함한 실제 초당 생산량
+export const incomeOf = (g) => rateOf(g.owned, g.workers) * prestigeMult(g.stones);
+export const tapPowerOf = (g) => clickPowerOf(g.clickLevel) * prestigeMult(g.stones);
+
+export const addGold = (g, amount) => ({
+  ...g,
+  gold: g.gold + amount,
+  totalEarned: g.totalEarned + amount,
+  runEarned: g.runEarned + amount,
+});
+
+// 날짜(YYYY-MM-DD)로 하루 단위 기록을 나눔
+export const todayKey = (date = new Date()) => date.toLocaleDateString("sv-SE");
+export const yesterdayKey = () => todayKey(new Date(Date.now() - 864e5));
+export const freshDaily = () => ({ day: todayKey(), taps: 0, pulls: 0, rushes: 0, ads: 0, claimed: QUESTS.map(() => false) });
+export const dailyOf = (daily) => (daily?.day === todayKey() ? daily : freshDaily());
+export const bumpDaily = (g, field, amount = 1) => {
+  const daily = dailyOf(g.daily);
+  return { ...g, daily: { ...daily, [field]: daily[field] + amount } };
+};
+
+export const questRewardOf = (g) => Math.max(1000, incomeOf(g) * 900);
+// 출석 n일차: n × 10분치 생산량, 7일차엔 금 티켓 1회 추가
+export const attendanceRewardOf = (g, day) => Math.max(500 * day, incomeOf(g) * 600 * day);
+export const nextStreakOf = (attendance) =>
+  attendance.last === yesterdayKey() ? (attendance.streak % 7) + 1 : 1;
 
 // times 번 뽑을 때의 총 가격 (한 번 뽑을 때마다 가격 상승)
 export const ticketCostOf = (ticket, pulls, times = 1) => {
@@ -141,6 +193,10 @@ export const rollWorker = (ticket, rand = Math.random) => {
     }
     roll -= ticket.odds[i];
   }
+  return pickWorker(rarity, rand);
+};
+
+export const pickWorker = (rarity, rand = Math.random) => {
   const pool = WORKERS.filter((w) => w.rarity === rarity);
   return pool[Math.floor(rand() * pool.length)];
 };
@@ -158,7 +214,7 @@ export const fmt = (n, decimals = 0) => {
 
 // 저장된 데이터(로컬/서버)를 게임 상태로 정리
 export const normalize = (saved) => {
-  if (!saved) return { ...INITIAL, owned: { ...INITIAL.owned }, workers: {}, pulls: {} };
+  if (!saved) return { ...INITIAL, owned: { ...INITIAL.owned }, workers: {}, pulls: {}, attendance: { ...INITIAL.attendance } };
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
   const counts = (obj, list) =>
     Object.fromEntries(list.map((item) => [item.id, Math.floor(num(obj?.[item.id]))]).filter(([, n]) => n > 0));
@@ -170,5 +226,24 @@ export const normalize = (saved) => {
     owned: Object.fromEntries(GENERATORS.map((g) => [g.id, Math.floor(num(saved.owned?.[g.id]))])),
     workers: counts(saved.workers, WORKERS),
     pulls: counts(saved.pulls, TICKETS),
+    runEarned: typeof saved.runEarned === "number" ? num(saved.runEarned) : num(saved.totalEarned),
+    stones: Math.floor(num(saved.stones)),
+    prestiges: Math.floor(num(saved.prestiges)),
+    pity: Math.floor(num(saved.pity)),
+    daily:
+      saved.daily && typeof saved.daily.day === "string"
+        ? {
+            day: saved.daily.day,
+            taps: num(saved.daily.taps),
+            pulls: num(saved.daily.pulls),
+            rushes: num(saved.daily.rushes),
+            ads: num(saved.daily.ads),
+            claimed: QUESTS.map((_, i) => Boolean(saved.daily.claimed?.[i])),
+          }
+        : null,
+    attendance: {
+      last: typeof saved.attendance?.last === "string" ? saved.attendance.last : "",
+      streak: Math.floor(num(saved.attendance?.streak)),
+    },
   };
 };

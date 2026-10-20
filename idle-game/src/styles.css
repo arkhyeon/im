@@ -815,6 +815,255 @@ input:focus-visible {
   80% { transform: translate(4px, -1px); }
 }
 
+/* ---------- 미션 · 환생 · 광고 · 박쥐 ---------- */
+
+.tab {
+  position: relative;
+}
+
+.dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5252;
+  box-shadow: 0 0 6px #ff5252;
+}
+
+.stone-chip {
+  font-size: 12px;
+  color: #ff9ef5;
+}
+
+.ad-wide {
+  position: relative;
+  overflow: hidden;
+  padding: 12px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(#ff7a45, #e8492a);
+  box-shadow: 0 4px 0 #a22f17;
+}
+
+.ad-wide:disabled {
+  background: #4a3d5c;
+  box-shadow: 0 4px 0 #2a2138;
+  color: #9483ad;
+  cursor: default;
+}
+
+.pity {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.merge-btn {
+  margin-top: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #4a2f00;
+  background: var(--rc);
+  cursor: pointer;
+  animation: glow-gold 1.2s ease-in-out infinite;
+}
+
+.prestige,
+.mission-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(var(--panel), var(--panel-deep));
+  border: 2px solid var(--line);
+}
+
+.prestige {
+  margin-top: 8px;
+  border-color: #8a5ab8;
+  background: linear-gradient(135deg, #4a2a63, var(--panel-deep));
+}
+
+.prestige-title,
+.mission-title {
+  font-size: 19px;
+}
+
+.prestige-title {
+  color: #ff9ef5;
+}
+
+.prestige-text,
+.mission-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.prestige-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.prestige-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(#c45ce0, #8e24aa);
+  box-shadow: 0 4px 0 #5a1670;
+}
+
+.prestige-btn:disabled {
+  background: #4a3d5c;
+  box-shadow: 0 4px 0 #2a2138;
+  color: #9483ad;
+  font-size: 13px;
+  cursor: default;
+}
+
+.attendance {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.att-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: #1a1228;
+  border: 2px solid var(--line);
+}
+
+.att-day.done {
+  color: #4a2f00;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.att-day.today {
+  border-color: var(--gold);
+  color: var(--gold);
+  animation: glow-gold 1s ease-in-out infinite;
+}
+
+.att-day.big {
+  border-color: #7ef9ff;
+}
+
+.att-icon {
+  font-size: 16px;
+}
+
+.quest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quest-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  font-size: 14px;
+}
+
+.quest-info .bar {
+  grid-column: 1;
+}
+
+.quest-count {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.quest-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #5fd068, #b9f6ca);
+  transition: width 0.3s;
+}
+
+.bat {
+  position: absolute;
+  left: -20%;
+  z-index: 7;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  animation-name: fly;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  filter: drop-shadow(0 0 10px rgba(255, 213, 74, 0.9));
+}
+
+.bat.reverse {
+  animation-name: fly-reverse;
+}
+
+.bat-bob {
+  display: block;
+  animation: bat-bob 0.9s ease-in-out infinite;
+}
+
+.wing-left,
+.wing-right {
+  transform-box: fill-box;
+  animation: flap 0.25s ease-in-out infinite alternate;
+}
+
+.wing-left {
+  transform-origin: right center;
+}
+
+.wing-right {
+  transform-origin: left center;
+}
+
+@keyframes fly {
+  from { left: -20%; }
+  to { left: 105%; }
+}
+@keyframes fly-reverse {
+  from { left: 105%; }
+  to { left: -20%; }
+}
+@keyframes bat-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(18px); }
+}
+@keyframes flap {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.35); }
+}
+
 /* ---------- 알림 배너 ---------- */
 
 .banner {

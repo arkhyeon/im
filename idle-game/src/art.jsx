@@ -305,3 +305,23 @@ export function TierAura({ tier }) {
   if (!tier) return null;
   return <div className={`aura tier${tier}`} style={{ "--tc": TIERS[tier].color }} />;
 }
+
+export function BatIcon({ size = 56 }) {
+  return (
+    <svg viewBox="0 0 80 50" width={size} height={size * 0.625} aria-hidden="true">
+      <g className="wing-left">
+        <path d="M34 22 Q20 4 2 12 Q10 18 8 26 Q16 22 20 30 Q26 24 34 28 Z" fill="#f5b301" stroke="#c98a00" strokeWidth="1.5" />
+      </g>
+      <g className="wing-right">
+        <path d="M46 22 Q60 4 78 12 Q70 18 72 26 Q64 22 60 30 Q54 24 46 28 Z" fill="#f5b301" stroke="#c98a00" strokeWidth="1.5" />
+      </g>
+      <ellipse cx="40" cy="26" rx="9" ry="11" fill="#ffd54a" stroke="#c98a00" strokeWidth="1.5" />
+      <path d="M33 17 L35 9 L38 16 Z M47 17 L45 9 L42 16 Z" fill="#ffd54a" stroke="#c98a00" strokeWidth="1" />
+      <circle cx="36.5" cy="23" r="1.8" fill="#4a2f00" />
+      <circle cx="43.5" cy="23" r="1.8" fill="#4a2f00" />
+      <path d="M37 29 L38.5 31 L40 29 L41.5 31 L43 29" stroke="#fff" strokeWidth="1" fill="none" />
+      <Sparkle x={62} y={8} size={0.5} color="#fffbe0" />
+      <Sparkle x={16} y={36} size={0.4} delay={0.6} color="#fffbe0" />
+    </svg>
+  );
+}
